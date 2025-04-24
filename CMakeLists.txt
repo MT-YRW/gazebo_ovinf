@@ -13,6 +13,7 @@ find_package(Eigen3 REQUIRED)
 
 add_library(ovinf SHARED
   ${CMAKE_CURRENT_SOURCE_DIR}/src/ovinf/ovinf_humanoid.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/ovinf/ovinf_humanoid_stand.cc
 )
 target_include_directories(ovinf PUBLIC
   ${OpenVINO_INCLUDE_DIRS}

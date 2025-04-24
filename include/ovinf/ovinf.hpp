@@ -10,6 +10,7 @@ namespace ovinf {
 
 template <typename T = float>
 struct ProprioceptiveObservation {
+  Eigen::Matrix<T, Eigen::Dynamic, 1> clock = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> command = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> ang_vel = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> proj_gravity = {};
