@@ -9,6 +9,7 @@
 #define HISTORY_BUFFER_HPP
 
 #include <Eigen/Core>
+#include <memory>
 
 namespace ovinf {
 
@@ -26,6 +27,8 @@ class HistoryBuffer {
   using MapT = Eigen::Map<U>;
 
  public:
+  using Ptr = std::shared_ptr<HistoryBuffer<T>>;
+
   /**
    * @brief Observation history buffer constructor.
    *        The buffer is initialized to 0.

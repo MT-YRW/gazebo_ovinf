@@ -1,0 +1,4 @@
+#ifndef FILTER_FACTORY_HPP
+#define FILTER_FACTORY_HPP
+
+#endif // !FILTER_FACTORY_HPP

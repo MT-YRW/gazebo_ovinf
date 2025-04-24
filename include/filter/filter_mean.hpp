@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "filter/filter_base.hpp"
+#include "utils/history_buffer.hpp"
 
 namespace ovinf {
 
@@ -15,19 +16,20 @@ class MeanFilter : public FilterBase<T> {
  public:
   MeanFilter() = delete;
   MeanFilter(YAML::Node const &config) : FilterBase<T>(config) {
-    lower_bound_ = config["lower_bound"].as<T>();
-    upper_bound_ = config["upper_bound"].as<T>();
+    buffer_size_ = config["buffer_size"].as<size_t>();
+    buffer_ = std::make_shared<HistoryBuffer<T>>(1, buffer_size_);
   }
 
   virtual T operator()(T const &input) final {
-    return std::max(lower_bound_, std::min(upper_bound_, input));
+    //
+    return 0;
   }
 
   virtual void Reset() final {};
 
  private:
-  T lower_bound_;
-  T upper_bound_;
+  size_t buffer_size_;
+  HistoryBuffer<T>::Ptr buffer_;
 };
 
 }  // namespace ovinf

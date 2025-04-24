@@ -4,6 +4,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Core>
+#include <type_traits>
 
 namespace ovinf {
 
