@@ -1,5 +1,5 @@
-#ifndef FILTER_MEAN_HPP
-#define FILTER_MEAN_HPP
+#ifndef FILTER_PASS_THROUGH_HPP
+#define FILTER_PASS_THROUGH_HPP
 
 #include <yaml-cpp/yaml.h>
 
@@ -11,10 +11,10 @@
 namespace ovinf {
 
 template <typename T = float>
-class MeanFilter : public FilterBase<T> {
+class PassThroughFilter : public FilterBase<T> {
  public:
-  MeanFilter() = delete;
-  MeanFilter(YAML::Node const &config) : FilterBase<T>(config) {
+  PassThroughFilter() = delete;
+  PassThroughFilter(YAML::Node const &config) : FilterBase<T>(config) {
     lower_bound_ = config["lower_bound"].as<T>();
     upper_bound_ = config["upper_bound"].as<T>();
   }
@@ -32,4 +32,4 @@ class MeanFilter : public FilterBase<T> {
 
 }  // namespace ovinf
 
-#endif  // !FILTER_MEAN_HPP
+#endif  // !FILTER_PASS_THROUGH_HPP

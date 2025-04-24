@@ -74,7 +74,7 @@ class PolicyController : public ControllerBase<float> {
       } else {
         std::cout << "target pos is empty" << std::endl;
       }
-      SetPdTorque();
+      ComputeJointPd();
     }
   }
 

@@ -94,12 +94,10 @@ class HistoryBuffer {
       throw std::out_of_range(
           "Index out of range. HistoryBuffer.GetObsHistory(size_t)");
     }
-    static VectorT obs_short_history;
-    obs_short_history.resize(size * single_obs_size_);
-    obs_short_history = MapT<VectorT>(
+    obs_short_history_ = MapT<VectorT>(
         data_ + ((current_index_ + 1) % buffer_size_) * single_obs_size_,
         size * single_obs_size_);
-    return obs_short_history;
+    return obs_short_history_;
   }
 
   /**
@@ -108,11 +106,10 @@ class HistoryBuffer {
    * @return Obs history
    */
   VectorT& GetObsHistory() {
-    static VectorT obs_history(single_obs_size_ * buffer_size_);
-    obs_history = MapT<VectorT>(
+    obs_history_ = MapT<VectorT>(
         data_ + ((current_index_ + 1) % buffer_size_) * single_obs_size_,
         single_obs_size_ * buffer_size_);
-    return obs_history;
+    return obs_history_;
   }
 
  private:
@@ -120,6 +117,9 @@ class HistoryBuffer {
   size_t single_obs_size_;
   size_t buffer_size_;
   size_t current_index_;
+
+  VectorT obs_short_history_;
+  VectorT obs_history_;
 };
 
 }  // namespace ovinf

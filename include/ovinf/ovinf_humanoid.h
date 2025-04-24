@@ -29,6 +29,9 @@
 
 namespace ovinf {
 
+/**
+ * @brief RobotEra humanoid gym inference.
+ */
 class HumanoidPolicy : public BasePolicy<float> {
   using MatrixT = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>;
   using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;

@@ -40,7 +40,7 @@ class ControllerBase {
   virtual void Stop() = 0;
 
  protected:
-  void SetPdTorque() {
+  void ComputeJointPd() {
     for (size_t i = 0; i < robot_->joint_size_; ++i) {
       T position_error = robot_->executor_->JointTargetPosition()[i] -
                          robot_->observer_->JointActualPosition()[i];

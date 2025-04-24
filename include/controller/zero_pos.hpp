@@ -51,7 +51,7 @@ class ZeroPosController : public ControllerBase<float> {
 
     if (set_target) {
       robot_->executor_->JointTargetPosition() = temp_target;
-      SetPdTorque();
+      ComputeJointPd();
     }
   }
 
