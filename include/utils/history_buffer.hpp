@@ -16,7 +16,7 @@ namespace ovinf {
 /**
  * @brief Vector observation buffer. Does NOT support multi-threading!
  *        This is sort of ring buffer but not exactly. Make sure you understand
- *        what happens in this class. Use at your risk)
+ *        what happens in this class. Use at your risk )
  *
  * @tparam T Data type. Scalar type only.
  */
@@ -45,8 +45,8 @@ class HistoryBuffer {
     data_ = new T[single_obs_size * (buffer_size * 2 - 1)];
     single_obs_size_ = single_obs_size;
     buffer_size_ = buffer_size;
-    current_index_ = -1;
 
+    current_index_ = -1;
     std::fill(data_, data_ + single_obs_size * (buffer_size * 2 - 1), 0);
   }
 
@@ -113,6 +113,11 @@ class HistoryBuffer {
         data_ + ((current_index_ + 1) % buffer_size_) * single_obs_size_,
         single_obs_size_ * buffer_size_);
     return obs_history_;
+  }
+
+  void Reset() {
+    current_index_ = -1;
+    std::fill(data_, data_ + single_obs_size_ * (buffer_size_ * 2 - 1), 0);
   }
 
  private:

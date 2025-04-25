@@ -29,7 +29,7 @@ class PolicyController : public ControllerBase<float> {
     command_ = VectorT::Zero(3);
     counter_ = 0;
 
-    inference_net_ = ovinf::PolicyFactory(config["inference"]);
+    inference_net_ = ovinf::PolicyFactory::CreatePolicy(config["inference"]);
   }
 
   virtual void WarmUp() final {

@@ -5,9 +5,9 @@
 #include "ovinf/ovinf_factory.hpp"
 int main() {
   YAML::Node config =
-      YAML::LoadFile("/home/dknt/Project/dl_deploy/ovinf/config/example.yaml");
+      YAML::LoadFile("/home/dknt/Project/dl_deploy/ovinf/config/humanoid.yaml");
 
-  auto policy = ovinf::PolicyFactory(config["inference"]);
+  auto policy = ovinf::PolicyFactory::CreatePolicy(config["inference"]);
 
   policy->WarmUp(
       {

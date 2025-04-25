@@ -21,3 +21,7 @@ target_link_libraries(model_verify
   ovinf
 )
 
+add_executable(filter_test filter_test.cc)
+target_link_libraries(filter_test
+  ovinf
+)
