@@ -36,7 +36,7 @@ class RobotBase {
       angular_velocity_ = VectorT::Zero(3);
       acceleration_ = VectorT::Zero(3);
       euler_rpy_ = VectorT::Zero(3);
-      proj_gravity_ = Eigen::Matrix<T, 3, 1>{0.0, 0.0, -1.0};
+      proj_gravity_ = VectorT::Zero(3);
     }
 
     virtual bool Update() = 0;

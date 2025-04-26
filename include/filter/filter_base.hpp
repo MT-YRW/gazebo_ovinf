@@ -39,7 +39,7 @@ class FilterBase {
     if constexpr (is_eigen_vector_v<T>) {
       if (first_input_) [[unlikely]] {
         first_input_ = false;
-        last_input_.resize(input.size()).setZero();
+        this->last_input_ = T(this->dimension_).setZero();
       }
     }
     return NanHandle(input);
@@ -78,7 +78,7 @@ class FilterBase {
    *
    * @return Updated last_input_
    */
-  T &NanHandle(T &input) {
+  T &NanHandle(T const &input) {
     if constexpr (is_eigen_vector_v<T>) {
       if (input.hasNaN()) {
         for (size_t i = 0; i < input.size(); ++i) {

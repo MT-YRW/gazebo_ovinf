@@ -20,7 +20,7 @@ class PassThroughFilter : public FilterBase<T> {
 
     if constexpr (is_eigen_vector_v<T>) {
       this->dimension_ = lower_bound_.rows();
-      this->last_input_.resize(this->dimension_).setZero();
+      this->last_input_ = T(this->dimension_).setZero();
 
       if (lower_bound_.size() != this->dimension_ ||
           upper_bound_.size() != this->dimension_) {

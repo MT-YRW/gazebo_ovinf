@@ -10,6 +10,8 @@
 namespace ovinf {
 
 class RobotHhfcMj : public RobotBase<float> {
+  using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+
  public:
   using Ptr = std::shared_ptr<RobotHhfcMj>;
 
@@ -18,7 +20,15 @@ class RobotHhfcMj : public RobotBase<float> {
    public:
     ObserverHhfcMj() = delete;
     ObserverHhfcMj(RobotBase<float>* robot, const YAML::Node& config)
-        : ObserverBase(robot, config) {}
+        : ObserverBase(robot, config) {
+      motor_pos_filter_ =
+          FilterFactory::CreateFilter(config["motor_pos_filter"]);
+      motor_vel_filter_ =
+          FilterFactory::CreateFilter(config["motor_vel_filter"]);
+      ang_vel_filter_ = FilterFactory::CreateFilter(config["ang_vel_filter"]);
+      acc_filter_ = FilterFactory::CreateFilter(config["acc_filter"]);
+      eluer_rpy_filter_ = FilterFactory::CreateFilter(config["euler_filter"]);
+    }
 
     virtual bool Update() final {
       auto robot_mj = dynamic_cast<RobotHhfcMj*>(robot_);
@@ -28,46 +38,43 @@ class RobotHhfcMj : public RobotBase<float> {
                                     robot_->motor_direction_(i, 0);
         motor_actual_velocity_[i] = robot_mj->motors_[i]->GetActualVelocity() *
                                     robot_->motor_direction_(i, 0);
-        joint_actual_position_[i] = motor_actual_position_[i];
-        joint_actual_velocity_[i] = motor_actual_velocity_[i];
       }
 
-      euler_rpy_ =
+      motor_actual_position_ =
+          motor_pos_filter_->Filter(motor_actual_position_);
+      motor_actual_velocity_ =
+          motor_vel_filter_->Filter(motor_actual_velocity_);
+
+      joint_actual_position_ = motor_actual_position_;
+      joint_actual_velocity_ = motor_actual_velocity_;
+
+      euler_rpy_ = eluer_rpy_filter_->Filter(
           Eigen::Vector3f(robot_mj->imu_->GetRoll(), robot_mj->imu_->GetPitch(),
-                          robot_mj->imu_->GetYaw());
-      acceleration_ =
+                          robot_mj->imu_->GetYaw()));
+
+      acceleration_ = acc_filter_->Filter(
           Eigen::Vector3f(robot_mj->imu_->GetAccX(), robot_mj->imu_->GetAccY(),
-                          robot_mj->imu_->GetAccZ());
-      angular_velocity_ = Eigen::Vector3f(robot_mj->imu_->GetGyroX(),
-                                          robot_mj->imu_->GetGyroY(),
-                                          robot_mj->imu_->GetGyroZ());
+                          robot_mj->imu_->GetAccZ()));
+      angular_velocity_ = ang_vel_filter_->Filter(Eigen::Vector3f(
+          robot_mj->imu_->GetGyroX(), robot_mj->imu_->GetGyroY(),
+          robot_mj->imu_->GetGyroZ()));
 
-      // nan check
-      for (size_t i = 0; i < 3; i++) {
-        if (std::isnan(euler_rpy_[i])) {
-          euler_rpy_[i] = 0;
-        }
-        if (std::isnan(acceleration_[i])) {
-          acceleration_[i] = 0;
-        }
-        if (std::isnan(angular_velocity_[i])) {
-          angular_velocity_[i] = 0;
-        }
-      }
-
-      Eigen::Matrix3f Rwb =
-          (Eigen::AngleAxisf(euler_rpy_[2], Eigen::Vector3f::UnitZ()) *
-           Eigen::AngleAxisf(euler_rpy_[1], Eigen::Vector3f::UnitY()) *
-           Eigen::AngleAxisf(euler_rpy_[0], Eigen::Vector3f::UnitX()))
-              .matrix();
-      proj_gravity_ = Rwb.transpose() * Eigen::Vector3f(0.0, 0.0, -1.0);
+      Eigen::Matrix3f Rwb(
+          Eigen::AngleAxisf(euler_rpy_[2], Eigen::Vector3f::UnitZ()) *
+          Eigen::AngleAxisf(euler_rpy_[1], Eigen::Vector3f::UnitY()) *
+          Eigen::AngleAxisf(euler_rpy_[0], Eigen::Vector3f::UnitX()));
+      proj_gravity_ =
+          VectorT(Rwb.transpose() * Eigen::Vector3f{0.0, 0.0, -1.0});
 
       return true;
     }
 
    private:
-    FilterBase<Eigen::Matrix<float, Eigen::Dynamic, 1>>::Ptr joint_pos_filter_;
-    FilterBase<Eigen::Matrix<float, -1, 1>>::Ptr joint_vel_filter_;
+    FilterBase<VectorT>::Ptr motor_pos_filter_;
+    FilterBase<VectorT>::Ptr motor_vel_filter_;
+    FilterBase<VectorT>::Ptr ang_vel_filter_;
+    FilterBase<VectorT>::Ptr acc_filter_;
+    FilterBase<VectorT>::Ptr eluer_rpy_filter_;
   };
 
   class ExecutorHhfcMj : public ExecutorBase {

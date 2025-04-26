@@ -4,7 +4,6 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Core>
-#include <iostream>
 
 #include "filter/filter_base.hpp"
 #include "utils/history_buffer.hpp"
@@ -59,10 +58,10 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
     history_length_ = config["history_length"].as<size_t>();
     lower_bound_ = this->ReadYamlParam(config["lower_bound"]);
     upper_bound_ = this->ReadYamlParam(config["upper_bound"]);
-    this->last_input_.resize(this->dimension_).setZero();
 
     if constexpr (is_eigen_vector_v<T>) {
       this->dimension_ = lower_bound_.rows();
+      this->last_input_ = T(this->dimension_).setZero();
 
       if (lower_bound_.size() != this->dimension_ ||
           upper_bound_.size() != this->dimension_) {
