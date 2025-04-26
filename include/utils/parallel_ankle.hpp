@@ -48,7 +48,7 @@ class ParallelAnkle {
   ParallelAnkle(const AnkleParameters &params, const T threshold = 1e-6);
 
   /**
-   * @brief Fake forward kinematics
+   * @brief Compute forward kinematics.
    * @param[in] theta1 Joint position 1 (left)
    * @param[in] theta2 Joint position 2 (right)
    * @return Foot pitch and roll [pitch, roll]
@@ -56,7 +56,9 @@ class ParallelAnkle {
   Eigen::Matrix<T, 2, 1> ForwardKinematics(const T theta1, const T theta2);
 
   /**
-   * @brief Fake mapping
+   * @brief Remap torque from pitch roll to joint torques. This method should be
+   * used after calling ForwardKinematics
+   *
    * @param[in] torque_pitch Torque in pitch
    * @param[in] torque_roll Torque in roll
    * @return Joint torques [j1, j2]
@@ -64,23 +66,26 @@ class ParallelAnkle {
   inline Eigen::Matrix<T, 2, 1> TorqueRemapping(const T torque_pitch,
                                                 const T torque_roll) {
     // [roll, pitch]
-    Eigen::Matrix<T, 2, 1> torque_ankle(torque_pitch, torque_roll);
-    // Eigen::Matrix<T, 2, 1> torque_motor =
-    //     this->J_c_.transpose().inverse() * torque_ankle;
+    Eigen::Matrix<T, 2, 1> torque_ankle(torque_roll, torque_pitch);
+    Eigen::Matrix<T, 2, 1> torque_motor =
+        this->J_c_.inverse().transpose() * torque_ankle;
+    return torque_motor;
+  }
+
+  inline Eigen::Matrix<T, 2, 1> TorqueMotor2Joint(const T t1, const T t2) {
+    // [roll, pitch]
+    Eigen::Matrix<T, 2, 1> torque_motor(t1, t2);
+    Eigen::Matrix<T, 2, 1> torque_ankle = this->J_c_.transpose() * torque_motor;
     return torque_ankle;
   }
 
-  /// @brief Fake mapping
-  /// @param omega1
-  /// @param omega2
-  /// @return
   inline Eigen::Matrix<T, 2, 1> VelocityMapping(const T omega1,
                                                 const T omega2) {
     Eigen::Matrix<T, 2, 1> vel_motor(omega1, omega2);
     // [roll, pitch]
-    // Eigen::Matrix<T, 2, 1> vel_ankle_rp = this->J_c_.inverse() * vel_motor;
-    // Eigen::Matrix<T, 2, 1> vel_ankle(vel_ankle_rp(1, 0), vel_ankle_rp(0, 0));
-    return vel_motor;
+    Eigen::Matrix<T, 2, 1> vel_ankle_rp = this->J_c_.inverse() * vel_motor;
+    Eigen::Matrix<T, 2, 1> vel_ankle(vel_ankle_rp(1, 0), vel_ankle_rp(0, 0));
+    return vel_ankle;
   }
 
  public:
@@ -106,6 +111,8 @@ class ParallelAnkle {
                        const T theta2);
 
  private:
+  size_t error_count_ = 0;
+  size_t fatal_count_ = 0;
   AnkleParameters params_;
   T l_rod1_;
   T l_bar1_;
@@ -146,8 +153,6 @@ ParallelAnkle<T>::ParallelAnkle(const AnkleParameters &params,
 template <typename T>
 Eigen::Matrix<T, 2, 1> ParallelAnkle<T>::InverseKinematics(const T pitch,
                                                            const T roll) {
-  return Eigen::Matrix<T, 2, 1>(pitch, roll);
-
   // TODO: Optimize this
   Eigen::Matrix<T, 3, 3> Rof = Eigen::Matrix<T, 3, 3>(
       Eigen::AngleAxis<T>(pitch, Eigen::Matrix<T, 3, 1>::UnitY()) *
@@ -179,15 +184,6 @@ Eigen::Matrix<T, 2, 1> ParallelAnkle<T>::InverseKinematics(const T pitch,
       (b2 * c2 + std::sqrt(b2 * b2 * c2 * c2 -
                            (a2 * a2 + b2 * b2) * (c2 * c2 - a2 * a2))) /
       (a2 * a2 + b2 * b2));
-
-  if (std::isnan(theta_res(0, 0))) {
-    theta_res(0, 0) = 0.0;
-    std::cout << "Ankle IK failed" << std::endl;
-  }
-  if (std::isnan(theta_res(1, 0))) {
-    theta_res(1, 0) = 0.0;
-    std::cout << "Ankle IK failed" << std::endl;
-  }
 
   return theta_res;
 }
@@ -246,9 +242,13 @@ void ParallelAnkle<T>::ComputeJacobian(const T pitch, const T roll,
 template <typename T>
 Eigen::Matrix<T, 2, 1> ParallelAnkle<T>::ForwardKinematics(const T theta1,
                                                            const T theta2) {
+  if (std::isnan(this->last_pitch_) || std::isnan(this->last_roll_)) {
+    std::cout << "Fatal in ankle solving!!! Press SPACE NOW!!!"
+              << this->fatal_count_++ << std::endl;
+    this->last_pitch_ = 0.0;
+    this->last_roll_ = 0.0;
+  }
   Eigen::Matrix<T, 2, 1> theta_ref(theta1, theta2);
-
-  return theta_ref;
 
   for (size_t i = 0; i < 10; ++i) {
     Eigen::Matrix<T, 2, 1> theta_k;
@@ -262,22 +262,37 @@ Eigen::Matrix<T, 2, 1> ParallelAnkle<T>::ForwardKinematics(const T theta1,
     this->ComputeJacobian(last_pitch_, last_roll_, theta_k(0, 0),
                           theta_k(1, 0));
 
-    if (err.norm() < this->threshold_) {
+    // Check
+    if (std::isnan(this->last_pitch_) || std::isnan(this->last_roll_)) {
+      // First check.
+      std::cout << "Ankle solving failed!!! Consider PRESS SPACE!!!"
+                << this->error_count_++ << std::endl;
+      std::cout << "theta1: " << theta1 << " theta2: " << theta2 << std::endl;
+      this->last_pitch_ = 0.0;
+      this->last_roll_ = 0.0;
+      theta_k = this->InverseKinematics(this->last_pitch_, this->last_roll_);
+      this->ComputeJacobian(last_pitch_, last_roll_, theta_k(0, 0),
+                            theta_k(1, 0));
+      break;
+    } else if (err.norm() < this->threshold_) {
       /*std::cout << "Iteration: " << i << std::endl;*/
       break;
+    } else {
+      Eigen::Matrix<T, 2, 1> x_c_k(this->last_roll_, this->last_pitch_);
+      x_c_k -= this->J_c_.inverse() * err;
+
+      /*std::cout << "xck: " << x_c_k.transpose() << std::endl << std::endl;*/
+
+      this->last_pitch_ = x_c_k(1, 0);
+      this->last_roll_ = x_c_k(0, 0);
     }
 
     /*std::cout << "Jacobian:\n" << this->J_c_ << std::endl;*/
-
-    Eigen::Matrix<T, 2, 1> x_c_k(this->last_roll_, this->last_pitch_);
-    x_c_k -= this->J_c_.inverse() * err;
-
-    /*std::cout << "xck: " << x_c_k.transpose() << std::endl << std::endl;*/
-
-    this->last_pitch_ = x_c_k(1, 0);
-    this->last_roll_ = x_c_k(0, 0);
   }
 
+  /*std::cout << std::format("Pitch: {} Roll: {}", this->last_pitch_,*/
+  /*                         this->last_roll_)*/
+  /*          << std::endl;*/
   Eigen::Matrix<T, 2, 1> pitch_roll(this->last_pitch_, this->last_roll_);
   return pitch_roll;
 }

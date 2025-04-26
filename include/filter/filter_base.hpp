@@ -12,22 +12,50 @@ namespace ovinf {
 /**
  * @brief Filter base class.
  */
-template <typename T = float>
+template <typename T = Eigen::Matrix<float, Eigen::Dynamic, 1>>
 class FilterBase {
  public:
+  using Ptr = std::shared_ptr<FilterBase<T>>;
+
   FilterBase() = delete;
   constexpr FilterBase(YAML::Node const &config) {
     if constexpr (is_eigen_vector_v<T>) {
       // dimension_ is read from the YAML file
       dimension_ = -1;
+      first_input_ = true;
     } else {
       this->dimension_ = 1;
+      last_input_ = 0;
     }
   }
 
-  virtual T Filter(T const &input) { return input; }
+  /**
+   * @brief Handle input, return filterd value
+   *
+   * @param[in] input input
+   * @return Filtered value
+   */
+  virtual T Filter(T const &input) {
+    if constexpr (is_eigen_vector_v<T>) {
+      if (first_input_) [[unlikely]] {
+        first_input_ = false;
+        last_input_.resize(input.size()).setZero();
+      }
+    }
+    return NanHandle(input);
+  }
 
-  virtual void Reset() {};
+  /**
+   * @brief Reset the filter
+   *
+   */
+  virtual void Reset() {
+    if constexpr (is_eigen_vector_v<T>) {
+      last_input_.setZero();
+    } else {
+      last_input_ = 0;
+    }
+  };
 
  protected:
   /**
@@ -45,8 +73,36 @@ class FilterBase {
     }
   }
 
+  /**
+   * @brief NaN handle, update last_input_ elementwise
+   *
+   * @return Updated last_input_
+   */
+  T &NanHandle(T &input) {
+    if constexpr (is_eigen_vector_v<T>) {
+      if (input.hasNaN()) {
+        for (size_t i = 0; i < input.size(); ++i) {
+          if (!std::isnan(input[i])) {
+            last_input_[i] = input[i];
+          }
+        }
+      } else {
+        last_input_ = input;
+      }
+    } else {
+      if (!std::isnan(input)) {
+        last_input_ = input;
+      }
+    }
+    return last_input_;
+  }
+
  protected:
   size_t dimension_ = 0;
+  T last_input_;
+
+ private:
+  bool first_input_ = true;
 };
 
 }  // namespace ovinf

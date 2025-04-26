@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "filter/filter_factory.hpp"
 #include "robot/base/robot_base.hpp"
 #include "robot/hhfc_mj/hhfc_mj_common.h"
 
@@ -65,6 +66,8 @@ class RobotHhfcMj : public RobotBase<float> {
     }
 
    private:
+    FilterBase<Eigen::Matrix<float, Eigen::Dynamic, 1>>::Ptr joint_pos_filter_;
+    FilterBase<Eigen::Matrix<float, -1, 1>>::Ptr joint_vel_filter_;
   };
 
   class ExecutorHhfcMj : public ExecutorBase {

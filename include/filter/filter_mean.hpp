@@ -28,13 +28,16 @@ class MeanFilter : public FilterBase<T> {
 
   virtual T Filter(T const &input) final {
     // This is a piece of shit...
-    history_buffer_->AddObservation(Eigen::Matrix<T, 1, 1>(
-        std::max(lower_bound_, std::min(upper_bound_, input))));
+    history_buffer_->AddObservation(Eigen::Matrix<T, 1, 1>(std::max(
+        lower_bound_, std::min(upper_bound_, this->NanHandle(input)))));
     auto obs = history_buffer_->GetObsHistory();
     return obs.mean();
   }
 
-  virtual void Reset() final { history_buffer_->Reset(); };
+  virtual void Reset() final {
+    history_buffer_->Reset();
+    this->last_input_ = 0;
+  };
 
  private:
   size_t history_length_;
@@ -56,6 +59,7 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
     history_length_ = config["history_length"].as<size_t>();
     lower_bound_ = this->ReadYamlParam(config["lower_bound"]);
     upper_bound_ = this->ReadYamlParam(config["upper_bound"]);
+    this->last_input_.resize(this->dimension_).setZero();
 
     if constexpr (is_eigen_vector_v<T>) {
       this->dimension_ = lower_bound_.rows();
@@ -76,7 +80,7 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
 
   virtual T Filter(T const &input) final {
     history_buffer_->AddObservation(
-        input.cwiseMin(upper_bound_).cwiseMax(lower_bound_));
+        this->NanHandle(input).cwiseMin(upper_bound_).cwiseMax(lower_bound_));
     auto obs_mat = Eigen::Map<Eigen::Matrix<typename T::Scalar, Eigen::Dynamic,
                                             Eigen::Dynamic, Eigen::RowMajor>>(
         history_buffer_->GetObsHistory().data(), history_length_,
@@ -84,7 +88,10 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
     return obs_mat.colwise().mean().transpose();
   }
 
-  virtual void Reset() final { history_buffer_->Reset(); };
+  virtual void Reset() final {
+    history_buffer_->Reset();
+    this->last_input_.setZero();
+  };
 
  private:
   size_t history_length_;

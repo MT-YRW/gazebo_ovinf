@@ -20,6 +20,7 @@ class PassThroughFilter : public FilterBase<T> {
 
     if constexpr (is_eigen_vector_v<T>) {
       this->dimension_ = lower_bound_.rows();
+      this->last_input_.resize(this->dimension_).setZero();
 
       if (lower_bound_.size() != this->dimension_ ||
           upper_bound_.size() != this->dimension_) {
@@ -34,13 +35,22 @@ class PassThroughFilter : public FilterBase<T> {
 
   virtual T Filter(T const &input) final {
     if constexpr (is_eigen_vector_v<T>) {
-      return input.cwiseMin(upper_bound_).cwiseMax(lower_bound_);
+      return this->NanHandle(input)
+          .cwiseMin(upper_bound_)
+          .cwiseMax(lower_bound_);
     } else {
-      return std::max(lower_bound_, std::min(upper_bound_, input));
+      return std::max(lower_bound_,
+                      std::min(upper_bound_, this->NanHandle(input)));
     }
   }
 
-  virtual void Reset() final {};
+  virtual void Reset() final {
+    if constexpr (is_eigen_vector_v<T>) {
+      this->last_input_.setZero();
+    } else {
+      this->last_input_ = 0;
+    }
+  };
 
  private:
   T lower_bound_;
