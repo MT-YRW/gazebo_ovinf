@@ -25,7 +25,7 @@ class FilterBase {
     }
   }
 
-  virtual T operator()(T const &input) { return input; }
+  virtual T Filter(T const &input) { return input; }
 
   virtual void Reset() {};
 

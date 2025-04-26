@@ -9,7 +9,7 @@ namespace ovinf {
 
 class FilterFactory {
  public:
-  template <typename T = float>
+  template <typename T = Eigen::Matrix<float, Eigen::Dynamic, 1>>
   static std::shared_ptr<FilterBase<T>> CreateFilter(YAML::Node const &config) {
     std::string filter_type = config["type"].as<std::string>();
     if (filter_type == "None") {

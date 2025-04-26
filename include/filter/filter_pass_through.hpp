@@ -32,7 +32,7 @@ class PassThroughFilter : public FilterBase<T> {
     }
   }
 
-  virtual T operator()(T const &input) final {
+  virtual T Filter(T const &input) final {
     if constexpr (is_eigen_vector_v<T>) {
       return input.cwiseMin(upper_bound_).cwiseMax(lower_bound_);
     } else {

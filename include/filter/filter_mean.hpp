@@ -26,7 +26,7 @@ class MeanFilter : public FilterBase<T> {
         std::make_unique<HistoryBuffer<T>>(this->dimension_, history_length_);
   }
 
-  virtual T operator()(T const &input) final {
+  virtual T Filter(T const &input) final {
     // This is a piece of shit...
     history_buffer_->AddObservation(Eigen::Matrix<T, 1, 1>(
         std::max(lower_bound_, std::min(upper_bound_, input))));
@@ -74,7 +74,7 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
                                                               history_length_);
   }
 
-  virtual T operator()(T const &input) final {
+  virtual T Filter(T const &input) final {
     history_buffer_->AddObservation(
         input.cwiseMin(upper_bound_).cwiseMax(lower_bound_));
     auto obs_mat = Eigen::Map<Eigen::Matrix<typename T::Scalar, Eigen::Dynamic,
