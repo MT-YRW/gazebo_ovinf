@@ -4,6 +4,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Core>
+#include <iostream>
 
 #include "utils/traits.h"
 
@@ -81,6 +82,7 @@ class FilterBase {
   T &NanHandle(T const &input) {
     if constexpr (is_eigen_vector_v<T>) {
       if (input.hasNaN()) {
+        // std::cout << "Nan detected" << std::endl;
         for (size_t i = 0; i < input.size(); ++i) {
           if (!std::isnan(input[i])) {
             last_input_[i] = input[i];

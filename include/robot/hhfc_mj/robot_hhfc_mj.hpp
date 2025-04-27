@@ -1,11 +1,13 @@
 #ifndef ROBOT_HHFC_MJ_HPP
 #define ROBOT_HHFC_MJ_HPP
 
+#include <filesystem>
 #include <vector>
 
 #include "filter/filter_factory.hpp"
 #include "robot/base/robot_base.hpp"
 #include "robot/hhfc_mj/hhfc_mj_common.h"
+#include "utils/csv_logger.hpp"
 
 namespace ovinf {
 
@@ -21,6 +23,7 @@ class RobotHhfcMj : public RobotBase<float> {
     ObserverHhfcMj() = delete;
     ObserverHhfcMj(RobotBase<float>* robot, const YAML::Node& config)
         : ObserverBase(robot, config) {
+      // Create Filter
       motor_pos_filter_ =
           FilterFactory::CreateFilter(config["motor_pos_filter"]);
       motor_vel_filter_ =
@@ -28,6 +31,12 @@ class RobotHhfcMj : public RobotBase<float> {
       ang_vel_filter_ = FilterFactory::CreateFilter(config["ang_vel_filter"]);
       acc_filter_ = FilterFactory::CreateFilter(config["acc_filter"]);
       eluer_rpy_filter_ = FilterFactory::CreateFilter(config["euler_filter"]);
+
+      // Create Logger
+      log_flag_ = config["log_data"].as<bool>();
+      if (log_flag_) {
+        CreateLog(config);
+      }
     }
 
     virtual bool Update() final {
@@ -66,8 +75,15 @@ class RobotHhfcMj : public RobotBase<float> {
       proj_gravity_ =
           VectorT(Rwb.transpose() * Eigen::Vector3f{0.0, 0.0, -1.0});
 
+      if (log_flag_) {
+        WriteLog();
+      }
       return true;
     }
+
+   private:
+    inline void CreateLog(YAML::Node const& config);
+    inline void WriteLog();
 
    private:
     FilterBase<VectorT>::Ptr motor_pos_filter_;
@@ -75,6 +91,9 @@ class RobotHhfcMj : public RobotBase<float> {
     FilterBase<VectorT>::Ptr ang_vel_filter_;
     FilterBase<VectorT>::Ptr acc_filter_;
     FilterBase<VectorT>::Ptr eluer_rpy_filter_;
+
+    bool log_flag_ = false;
+    CsvLogger::Ptr csv_logger_;
   };
 
   class ExecutorHhfcMj : public ExecutorBase {
@@ -187,6 +206,159 @@ void RobotHhfcMj::GetDevice(const KernelBus& bus) {
   motors_[RShoulderPitchMotor] = bus.GetDevice<MotorDevice>(0).value();
 
   imu_ = bus.GetDevice<ImuDevice>(3).value();
+}
+
+void RobotHhfcMj::ObserverHhfcMj::CreateLog(YAML::Node const& config) {
+  auto now = std::chrono::system_clock::now();
+  std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+  std::tm* now_tm = std::localtime(&now_time);
+  std::stringstream ss;
+  ss << std::put_time(now_tm, "%Y-%m-%d-%H-%M-%S");
+  std::string current_time = ss.str();
+
+  std::string log_dir = config["log_dir"].as<std::string>();
+  std::filesystem::path config_file_path(log_dir);
+  if (config_file_path.is_relative()) {
+    config_file_path = canonical(config_file_path);
+  }
+
+  std::string logger_file =
+      config_file_path.string() + "/" + current_time + "_extra.csv";
+
+  if (!exists(config_file_path)) {
+    create_directories(config_file_path);
+  }
+
+  // Get headers
+  std::vector<std::string> headers;
+
+  // Motor actual pos
+  for (size_t i = 0; i < motor_size_; ++i) {
+    headers.push_back("motor_actual_pos_" + std::to_string(i));
+  }
+
+  // Motor actual vel
+  for (size_t i = 0; i < motor_size_; ++i) {
+    headers.push_back("motor_actual_vel_" + std::to_string(i));
+  }
+
+  // Joint actual pos
+  for (size_t i = 0; i < joint_size_; ++i) {
+    headers.push_back("joint_actual_pos_" + std::to_string(i));
+  }
+
+  // Joint actual vel
+  for (size_t i = 0; i < joint_size_; ++i) {
+    headers.push_back("joint_actual_vel_" + std::to_string(i));
+  }
+
+  // Motor target pos
+  for (size_t i = 0; i < motor_size_; ++i) {
+    headers.push_back("motor_target_pos_" + std::to_string(i));
+  }
+
+  // Motor target torque
+  for (size_t i = 0; i < motor_size_; ++i) {
+    headers.push_back("motor_target_torque_" + std::to_string(i));
+  }
+
+  // Joint target pos
+  for (size_t i = 0; i < joint_size_; ++i) {
+    headers.push_back("joint_target_pos_" + std::to_string(i));
+  }
+
+  // Joint target torque
+  for (size_t i = 0; i < joint_size_; ++i) {
+    headers.push_back("joint_target_torque_" + std::to_string(i));
+  }
+
+  // Acc
+  headers.push_back("acc_x");
+  headers.push_back("acc_y");
+  headers.push_back("acc_z");
+
+  // Ang vel
+  headers.push_back("ang_vel_x");
+  headers.push_back("ang_vel_y");
+  headers.push_back("ang_vel_z");
+
+  // Euler RPY
+  headers.push_back("euler_roll");
+  headers.push_back("euler_pitch");
+  headers.push_back("euler_yaw");
+
+  // Proj gravity
+  headers.push_back("proj_gravity_x");
+  headers.push_back("proj_gravity_y");
+  headers.push_back("proj_gravity_z");
+
+  csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
+}
+
+void RobotHhfcMj::ObserverHhfcMj::WriteLog() {
+  std::vector<CsvLogger::Number> datas;
+
+  // Motor actual pos
+  for (size_t i = 0; i < motor_size_; ++i) {
+    datas.push_back(motor_actual_position_[i]);
+  }
+
+  // Motor actual vel
+  for (size_t i = 0; i < motor_size_; ++i) {
+    datas.push_back(motor_actual_velocity_[i]);
+  }
+
+  // Joint actual pos
+  for (size_t i = 0; i < joint_size_; ++i) {
+    datas.push_back(joint_actual_position_[i]);
+  }
+
+  // Joint actual vel
+  for (size_t i = 0; i < joint_size_; ++i) {
+    datas.push_back(joint_actual_velocity_[i]);
+  }
+
+  // Motor target pos
+  for (size_t i = 0; i < motor_size_; ++i) {
+    datas.push_back(robot_->executor_->MotorTargetPosition()[i]);
+  }
+
+  // Motor target torque
+  for (size_t i = 0; i < motor_size_; ++i) {
+    datas.push_back(robot_->executor_->MotorTargetTorque()[i]);
+  }
+
+  // Joint target pos
+  for (size_t i = 0; i < joint_size_; ++i) {
+    datas.push_back(robot_->executor_->JointTargetPosition()[i]);
+  }
+
+  // Joint target torque
+  for (size_t i = 0; i < joint_size_; ++i) {
+    datas.push_back(robot_->executor_->JointTargetTorque()[i]);
+  }
+
+  // Acc
+  datas.push_back(acceleration_[0]);
+  datas.push_back(acceleration_[1]);
+  datas.push_back(acceleration_[2]);
+
+  // Ang vel
+  datas.push_back(angular_velocity_[0]);
+  datas.push_back(angular_velocity_[1]);
+  datas.push_back(angular_velocity_[2]);
+
+  // Euler RPY
+  datas.push_back(euler_rpy_[0]);
+  datas.push_back(euler_rpy_[1]);
+  datas.push_back(euler_rpy_[2]);
+
+  // Proj gravity
+  datas.push_back(proj_gravity_[0]);
+  datas.push_back(proj_gravity_[1]);
+  datas.push_back(proj_gravity_[2]);
+
+  csv_logger_->Write(datas);
 }
 
 }  // namespace ovinf

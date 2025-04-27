@@ -45,6 +45,12 @@ HumanoidPolicy::HumanoidPolicy(const YAML::Node &config) : BasePolicy(config) {
   last_action_ = VectorT(12).setZero();
   latest_target_ = VectorT(12).setZero();
 
+  // Create logger
+  log_flag_ = config["log_data"].as<bool>();
+  if (log_flag_) {
+    CreateLog(config);
+  }
+
   // Create model
   compiled_model_ = ov::Core().compile_model(model_path_, device_);
   if (compiled_model_.input().get_element_type() != ov::element::f32) {
@@ -153,6 +159,11 @@ bool HumanoidPolicy::InferUnsync(
 
     infer_request_.set_input_tensor(input_tensor);
     inference_done_.store(false);
+
+    if (log_flag_) {
+      WriteLog(obs_pack);
+    }
+
     return true;
   }
 }
@@ -222,6 +233,89 @@ void HumanoidPolicy::WorkerThread() {
     inference_done_.store(true);
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
+}
+
+void HumanoidPolicy::CreateLog(YAML::Node const &config) {
+  auto now = std::chrono::system_clock::now();
+  std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+  std::tm *now_tm = std::localtime(&now_time);
+  std::stringstream ss;
+  ss << std::put_time(now_tm, "%Y-%m-%d-%H-%M-%S");
+  std::string current_time = ss.str();
+
+  std::string log_dir = config["log_dir"].as<std::string>();
+  std::filesystem::path config_file_path(log_dir);
+  if (config_file_path.is_relative()) {
+    config_file_path = canonical(config_file_path);
+  }
+
+  if (!exists(config_file_path)) {
+    create_directories(config_file_path);
+  }
+
+  std::string logger_file =
+      config_file_path.string() + "/" + current_time + "_humanoid.csv";
+
+  // Get headers
+  std::vector<std::string> headers;
+
+  headers.push_back("clock_sin");
+  headers.push_back("clock_cos");
+  headers.push_back("command_vel_x");
+  headers.push_back("command_vel_y");
+  headers.push_back("command_vel_w");
+  for (size_t i = 0; i < action_size_; ++i) {
+    headers.push_back("joint_pos_" + std::to_string(i));
+  }
+  for (size_t i = 0; i < action_size_; ++i) {
+    headers.push_back("joint_vel_" + std::to_string(i));
+  }
+  for (size_t i = 0; i < action_size_; ++i) {
+    headers.push_back("last_action_" + std::to_string(i));
+  }
+  headers.push_back("ang_vel_x");
+  headers.push_back("ang_vel_y");
+  headers.push_back("ang_vel_z");
+  headers.push_back("prog_gravity_x");
+  headers.push_back("prog_gravity_y");
+  headers.push_back("prog_gravity_z");
+
+  csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
+}
+
+void HumanoidPolicy::WriteLog(
+    ProprioceptiveObservation<float> const &obs_pack) {
+  std::vector<CsvLogger::Number> datas;
+
+  double current_gait_time =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                    gait_start_time_)
+          .count();
+  double gait_time_value = 2 * M_PI * current_gait_time / cycle_time_;
+
+  datas.push_back(std::sin(gait_time_value));
+  datas.push_back(std::cos(gait_time_value));
+
+  for (size_t i = 0; i < 3; ++i) {
+    datas.push_back(obs_pack.command(i));
+  }
+  for (size_t i = 0; i < action_size_; ++i) {
+    datas.push_back(obs_pack.joint_pos(i));
+  }
+  for (size_t i = 0; i < action_size_; ++i) {
+    datas.push_back(obs_pack.joint_vel(i));
+  }
+  for (size_t i = 0; i < action_size_; ++i) {
+    datas.push_back(last_action_(i));
+  }
+  for (size_t i = 0; i < 3; ++i) {
+    datas.push_back(obs_pack.ang_vel(i));
+  }
+  for (size_t i = 0; i < 3; ++i) {
+    datas.push_back(obs_pack.proj_gravity(i));
+  }
+
+  csv_logger_->Write(datas);
 }
 
 }  // namespace ovinf

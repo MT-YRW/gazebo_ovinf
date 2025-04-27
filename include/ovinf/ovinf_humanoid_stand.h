@@ -24,6 +24,7 @@
 #include "atomicops.h"
 #include "ovinf.hpp"
 #include "readerwriterqueue.h"
+#include "utils/csv_logger.hpp"
 #include "utils/history_buffer.hpp"
 #include "utils/realtime_setting.hpp"
 
@@ -69,6 +70,8 @@ class HumanoidStandPolicy : public BasePolicy<float> {
 
  private:
   void WorkerThread();
+  void CreateLog(YAML::Node const &config);
+  void WriteLog(ProprioceptiveObservation<float> const &obs_pack);
 
  private:
   // Threading
@@ -111,6 +114,10 @@ class HumanoidStandPolicy : public BasePolicy<float> {
   std::chrono::steady_clock::time_point gait_start_time_;
   std::chrono::high_resolution_clock::time_point infer_start_time_;
   std::chrono::high_resolution_clock::time_point infer_end_time_;
+
+  // Logger
+  bool log_flag_ = false;
+  CsvLogger::Ptr csv_logger_;
 };
 }  // namespace ovinf
 

@@ -59,6 +59,8 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
     lower_bound_ = this->ReadYamlParam(config["lower_bound"]);
     upper_bound_ = this->ReadYamlParam(config["upper_bound"]);
 
+    first_input_ = true;
+
     if constexpr (is_eigen_vector_v<T>) {
       this->dimension_ = lower_bound_.rows();
       this->last_input_ = T(this->dimension_).setZero();
@@ -78,6 +80,16 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
   }
 
   virtual T Filter(T const &input) final {
+    if (first_input_) [[unlikely]] {
+      first_input_ = false;
+      for (size_t i = 0; i < history_length_; ++i) {
+        history_buffer_->AddObservation(this->NanHandle(input)
+                                            .cwiseMin(upper_bound_)
+                                            .cwiseMax(lower_bound_));
+      }
+      return history_buffer_->GetObservation(0);
+    }
+
     history_buffer_->AddObservation(
         this->NanHandle(input).cwiseMin(upper_bound_).cwiseMax(lower_bound_));
     auto obs_mat = Eigen::Map<Eigen::Matrix<typename T::Scalar, Eigen::Dynamic,
@@ -93,6 +105,8 @@ class MeanFilter<Eigen::Matrix<Scalar, Rows, 1, Options, MaxRows, 1>>
   };
 
  private:
+  bool first_input_ = true;
+
   size_t history_length_;
   T lower_bound_;
   T upper_bound_;

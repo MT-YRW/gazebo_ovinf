@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "controller/controller_base.hpp"
+#include "filter/filter_mean.hpp"
 #include "ovinf/ovinf_factory.hpp"
 
 namespace ovinf {
@@ -52,6 +53,26 @@ class PolicyController : public ControllerBase<float> {
       std::cerr << "PolicyController not ready" << std::endl;
       return;
     }
+
+    // TODO: Test vel filter
+    // static MeanFilter<VectorT> vel_filter(YAML::Load(R"(
+    //   type: "Mean"
+    //   history_length: 3
+    //   lower_bound: [-50.0, -50.0, -50.0, -50.0, -50.0, -50.0,
+    //                 -50.0, -50.0, -50.0, -50.0, -50.0, -50.0]
+    //   upper_bound: [50.0, 50.0, 50.0, 50.0, 50.0, 50.0,
+    //                 50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+    // )"));
+    //
+    // if (counter_++ % decimation_ == 0) {
+    //   auto err = inference_net_->InferUnsync(
+    //       {.command = command_,
+    //        .ang_vel = robot_->observer_->AngularVelocity(),
+    //        .proj_gravity = robot_->observer_->ProjGravity(),
+    //        .joint_pos = robot_->observer_->JointActualPosition().segment(0,
+    //        12), .joint_vel = vel_filter.Filter(
+    //            robot_->observer_->JointActualVelocity().segment(0, 12))});
+    // }
 
     if (counter_++ % decimation_ == 0) {
       auto err = inference_net_->InferUnsync(
