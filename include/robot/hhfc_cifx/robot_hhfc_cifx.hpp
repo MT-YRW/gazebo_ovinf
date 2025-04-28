@@ -40,15 +40,19 @@ class RobotHhfcCifx : public RobotBase<float> {
     }
 
     virtual bool Update() final {
-      auto robot_mj = dynamic_cast<RobotHhfcCifx*>(robot_);
+      auto robot_cifx = dynamic_cast<RobotHhfcCifx*>(robot_);
 
+      // Get motor posision and velocity
       for (size_t i = 0; i < motor_size_; ++i) {
-        motor_actual_position_[i] = robot_mj->motors_[i]->GetActualPosition() *
-                                    robot_->motor_direction_(i, 0);
-        motor_actual_velocity_[i] = robot_mj->motors_[i]->GetActualVelocity() *
-                                    robot_->motor_direction_(i, 0);
+        motor_actual_position_[i] =
+            robot_cifx->motors_[i]->GetActualPosition() *
+            robot_->motor_direction_(i, 0);
+        motor_actual_velocity_[i] =
+            robot_cifx->motors_[i]->GetActualVelocity() *
+            robot_->motor_direction_(i, 0);
       }
 
+      // Filter the data
       motor_actual_position_ =
           motor_pos_filter_->Filter(motor_actual_position_);
       motor_actual_velocity_ =
@@ -57,16 +61,72 @@ class RobotHhfcCifx : public RobotBase<float> {
       joint_actual_position_ = motor_actual_position_;
       joint_actual_velocity_ = motor_actual_velocity_;
 
-      euler_rpy_ = eluer_rpy_filter_->Filter(
-          Eigen::Vector3f(robot_mj->imu_->GetRoll(), robot_mj->imu_->GetPitch(),
-                          robot_mj->imu_->GetYaw()));
+      // Parallel ankle handle
+      if constexpr (true) {
+        auto left_joint_pos = robot_cifx->ankles_[LEFT]->ForwardKinematics(
+            motor_actual_position_[LAnkleLongMotor],
+            motor_actual_position_[LAnkleShortMotor]);
+        auto right_joint_pos = robot_cifx->ankles_[RIGHT]->ForwardKinematics(
+            motor_actual_position_[RAnkleShortMotor],
+            motor_actual_position_[RAnkleLongMotor]);
+        auto left_joint_vel = robot_cifx->ankles_[LEFT]->VelocityMapping(
+            motor_actual_velocity_[LAnkleLongMotor],
+            motor_actual_velocity_[LAnkleShortMotor]);
+        auto right_joint_vel = robot_cifx->ankles_[RIGHT]->VelocityMapping(
+            motor_actual_velocity_[RAnkleShortMotor],
+            motor_actual_velocity_[RAnkleLongMotor]);
 
-      acceleration_ = acc_filter_->Filter(
-          Eigen::Vector3f(robot_mj->imu_->GetAccX(), robot_mj->imu_->GetAccY(),
-                          robot_mj->imu_->GetAccZ()));
+        joint_actual_position_[LAnklePitchJoint] = left_joint_pos(0, 0);
+        joint_actual_position_[LAnkleRollJoint] = left_joint_pos(1, 0);
+        joint_actual_position_[RAnklePitchJoint] = right_joint_pos(0, 0);
+        joint_actual_position_[RAnkleRollJoint] = right_joint_pos(1, 0);
+
+        joint_actual_velocity_[LAnklePitchJoint] = left_joint_vel(0, 0);
+        joint_actual_velocity_[LAnkleRollJoint] = left_joint_vel(1, 0);
+        joint_actual_velocity_[RAnklePitchJoint] = left_joint_vel(0, 0);
+        joint_actual_velocity_[RAnkleRollJoint] = left_joint_vel(1, 0);
+
+        // Set frontend extra data
+        robot_cifx->extra_data_->Set<"l_p_pos">(
+            joint_actual_position_[LAnklePitchJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"l_r_pos">(
+            joint_actual_position_[LAnkleRollJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"r_p_pos">(
+            joint_actual_position_[RAnklePitchJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"r_r_pos">(
+            joint_actual_position_[RAnkleRollJoint] / M_PI * 180.0);
+
+        robot_cifx->extra_data_->Set<"l_p_vel">(
+            joint_actual_velocity_[LAnklePitchJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"l_r_vel">(
+            joint_actual_velocity_[LAnkleRollJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"r_p_vel">(
+            joint_actual_velocity_[RAnklePitchJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"r_r_vel">(
+            joint_actual_velocity_[RAnkleRollJoint] / M_PI * 180.0);
+
+        robot_cifx->extra_data_->Set<"l_p_tor">(
+            robot_cifx->executor_->JointTargetTorque()[LAnklePitchJoint]);
+        robot_cifx->extra_data_->Set<"l_r_tor">(
+            robot_cifx->executor_->JointTargetTorque()[LAnkleRollJoint]);
+        robot_cifx->extra_data_->Set<"r_p_tor">(
+            robot_cifx->executor_->JointTargetTorque()[RAnklePitchJoint]);
+        robot_cifx->extra_data_->Set<"r_r_tor">(
+            robot_cifx->executor_->JointTargetTorque()[RAnklePitchJoint]);
+      }
+
+      // cifx imu returns angles in degree
+      euler_rpy_ = eluer_rpy_filter_->Filter(
+          Eigen::Vector3f(robot_cifx->imu_->GetRoll() / 180 * M_PI,
+                          robot_cifx->imu_->GetPitch() / 180 * M_PI,
+                          robot_cifx->imu_->GetYaw() / 180 * M_PI));
+
+      acceleration_ = acc_filter_->Filter(Eigen::Vector3f(
+          robot_cifx->imu_->GetAccX(), robot_cifx->imu_->GetAccY(),
+          robot_cifx->imu_->GetAccZ()));
       angular_velocity_ = ang_vel_filter_->Filter(Eigen::Vector3f(
-          robot_mj->imu_->GetGyroX(), robot_mj->imu_->GetGyroY(),
-          robot_mj->imu_->GetGyroZ()));
+          robot_cifx->imu_->GetGyroX(), robot_cifx->imu_->GetGyroY(),
+          robot_cifx->imu_->GetGyroZ()));
 
       Eigen::Matrix3f Rwb(
           Eigen::AngleAxisf(euler_rpy_[2], Eigen::Vector3f::UnitZ()) *
@@ -103,16 +163,42 @@ class RobotHhfcCifx : public RobotBase<float> {
         : ExecutorBase(robot, config) {}
 
     virtual bool ExecuteJointTorque() final {
-      for (size_t i = 0; i < joint_size_; ++i) {
-        motor_target_torque_[i] = joint_target_torque_[i];
-        motor_target_position_[i] = joint_target_position_[i];
+      auto robot_cifx = dynamic_cast<RobotHhfcCifx*>(robot_);
+      motor_target_position_ = joint_target_position_;
+      motor_target_torque_ = joint_target_torque_;
+
+      // Parallel ankle handle
+      if constexpr (true) {
+        auto left_mot_target_pos = robot_cifx->ankles_[LEFT]->InverseKinematics(
+            joint_target_position_[LAnklePitchJoint],
+            joint_target_position_[LAnkleRollJoint]);
+        auto right_mot_target_pos =
+            robot_cifx->ankles_[RIGHT]->InverseKinematics(
+                joint_target_position_[RAnklePitchJoint],
+                joint_target_position_[RAnkleRollJoint]);
+        motor_target_position_[LAnkleLongMotor] = left_mot_target_pos[0];
+        motor_target_position_[LAnkleShortMotor] = left_mot_target_pos[1];
+        motor_target_position_[RAnkleLongMotor] = right_mot_target_pos[1];
+        motor_target_position_[RAnkleShortMotor] = right_mot_target_pos[0];
+
+        auto left_mot_target_tor = robot_cifx->ankles_[LEFT]->TorqueRemapping(
+            joint_target_torque_[LAnklePitchJoint],
+            joint_target_torque_[LAnkleRollJoint]);
+        auto right_mot_target_tor = robot_cifx->ankles_[RIGHT]->TorqueRemapping(
+            joint_target_torque_[RAnklePitchJoint],
+            joint_target_torque_[RAnkleRollJoint]);
+        motor_target_torque_[LAnkleLongMotor] = left_mot_target_tor[0];
+        motor_target_torque_[LAnkleShortMotor] = left_mot_target_tor[1];
+        motor_target_torque_[RAnkleLongMotor] = right_mot_target_tor[1];
+        motor_target_torque_[RAnkleShortMotor] = right_mot_target_tor[0];
       }
+
       ExecuteMotorTorque();
       return true;
     }
 
     virtual bool ExecuteMotorTorque() final {
-      auto robot_mj = dynamic_cast<RobotHhfcCifx*>(robot_);
+      auto robot_cifx = dynamic_cast<RobotHhfcCifx*>(robot_);
       for (size_t i = 0; i < motor_size_; ++i) {
         // Torque limit
         if (motor_target_torque_[i] > torque_limit_[i]) {
@@ -133,10 +219,10 @@ class RobotHhfcCifx : public RobotBase<float> {
 
       // Set target
       for (size_t i = 0; i < motor_size_; ++i) {
-        robot_mj->motors_[i]->SetTargetTorque(motor_target_torque_[i] *
-                                              robot_->motor_direction_(i, 0));
-        robot_mj->motors_[i]->SetTargetPosition(motor_target_position_[i] *
+        robot_cifx->motors_[i]->SetTargetTorque(motor_target_torque_[i] *
                                                 robot_->motor_direction_(i, 0));
+        robot_cifx->motors_[i]->SetTargetPosition(
+            motor_target_position_[i] * robot_->motor_direction_(i, 0));
       }
       return true;
     }
@@ -158,9 +244,37 @@ class RobotHhfcCifx : public RobotBase<float> {
         (RobotBase<float>*)this, config["observer"]);
     this->executor_ = std::make_shared<ExecutorHhfcCifx>(
         (RobotBase<float>*)this, config["executor"]);
+
+    // Create ankle resolver from yaml config file
+    this->ankles_[LEFT] = AnkleFromYaml(config["ankle_left"]);
+    this->ankles_[RIGHT] = AnkleFromYaml(config["ankle_left"]);
+  }
+
+  AnklePtr AnkleFromYaml(YAML::Node const& config) {
+    return std::make_shared<AnkleT>(AnkleT::AnkleParameters{
+        .l_bar1 = config["l_bar1"].as<float>(),
+        .l_rod1 = config["l_rod1"].as<float>(),
+        .r_a1 = Yaml2Eigen(config["r_a1"]),
+        .r_b1_0 = Yaml2Eigen(config["r_b1_0"]),
+        .r_c1_0 = Yaml2Eigen(config["r_c1_0"]),
+        .l_bar2 = config["l_bar2"].as<float>(),
+        .l_rod2 = config["l_rod2"].as<float>(),
+        .r_a2 = Yaml2Eigen(config["r_a2"]),
+        .r_b2_0 = Yaml2Eigen(config["r_b2_0"]),
+        .r_c2_0 = Yaml2Eigen(config["r_c2_0"]),
+    });
+  }
+
+  inline VectorT Yaml2Eigen(YAML::Node const& config) {
+    return Eigen::Map<VectorT>(config.as<std::vector<float>>().data(),
+                               config.size());
   }
 
   inline void GetDevice(const KernelBus& bus);
+
+  void SetExtraData(Kernel::ExtraData& extra_data) {
+    extra_data_ = &extra_data;
+  }
 
   virtual void PrintInfo() final {
     for (auto const& pair : motor_names_) {
@@ -184,7 +298,8 @@ class RobotHhfcCifx : public RobotBase<float> {
  private:
   std::vector<MotorPtr> motors_ = {};
   ImuPtr imu_;
-  // std::vector<AnklePtr> ankles_;
+  std::vector<AnklePtr> ankles_;
+  Kernel::ExtraData* extra_data_;
 };
 
 void RobotHhfcCifx::GetDevice(const KernelBus& bus) {
@@ -192,15 +307,15 @@ void RobotHhfcCifx::GetDevice(const KernelBus& bus) {
   motors_[LHipRollMotor] = bus.GetDevice<MotorDevice>(11).value();
   motors_[LHipYawMotor] = bus.GetDevice<MotorDevice>(12).value();
   motors_[LKneeMotor] = bus.GetDevice<MotorDevice>(13).value();
-  motors_[LAnklePitchMotor] = bus.GetDevice<MotorDevice>(14).value();
-  motors_[LAnkleRollMotor] = bus.GetDevice<MotorDevice>(15).value();
+  motors_[LAnkleLongMotor] = bus.GetDevice<MotorDevice>(14).value();
+  motors_[LAnkleShortMotor] = bus.GetDevice<MotorDevice>(15).value();
 
   motors_[RHipPitchMotor] = bus.GetDevice<MotorDevice>(4).value();
   motors_[RHipRollMotor] = bus.GetDevice<MotorDevice>(5).value();
   motors_[RHipYawMotor] = bus.GetDevice<MotorDevice>(6).value();
   motors_[RKneeMotor] = bus.GetDevice<MotorDevice>(7).value();
-  motors_[RAnklePitchMotor] = bus.GetDevice<MotorDevice>(8).value();
-  motors_[RAnkleRollMotor] = bus.GetDevice<MotorDevice>(9).value();
+  motors_[RAnkleLongMotor] = bus.GetDevice<MotorDevice>(8).value();
+  motors_[RAnkleShortMotor] = bus.GetDevice<MotorDevice>(9).value();
 
   motors_[LShoulderPitchMotor] = bus.GetDevice<MotorDevice>(1).value();
   motors_[RShoulderPitchMotor] = bus.GetDevice<MotorDevice>(0).value();

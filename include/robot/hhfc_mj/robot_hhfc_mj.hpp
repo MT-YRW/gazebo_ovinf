@@ -103,10 +103,9 @@ class RobotHhfcMj : public RobotBase<float> {
         : ExecutorBase(robot, config) {}
 
     virtual bool ExecuteJointTorque() final {
-      for (size_t i = 0; i < joint_size_; ++i) {
-        motor_target_torque_[i] = joint_target_torque_[i];
-        motor_target_position_[i] = joint_target_position_[i];
-      }
+      motor_target_position_ = joint_target_position_;
+      motor_target_torque_ = joint_target_torque_;
+
       ExecuteMotorTorque();
       return true;
     }
@@ -161,6 +160,10 @@ class RobotHhfcMj : public RobotBase<float> {
   }
 
   inline void GetDevice(const KernelBus& bus);
+
+  void SetExtraData(Kernel::ExtraData& extra_data) {
+    extra_data_ = &extra_data;
+  }
 
   virtual void PrintInfo() final {
     for (auto const& pair : motor_names_) {
