@@ -93,7 +93,7 @@ class PolicyController : public ControllerBase<float> {
         robot_->executor_->JointTargetPosition()[12] = 0.0;
         robot_->executor_->JointTargetPosition()[13] = 0.0;
       } else {
-        std::cout << "target pos is empty" << std::endl;
+        // std::cout << "target pos is empty" << std::endl;
       }
       ComputeJointPd();
     }

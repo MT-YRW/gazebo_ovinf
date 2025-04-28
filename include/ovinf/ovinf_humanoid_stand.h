@@ -64,7 +64,7 @@ class HumanoidStandPolicy : public BasePolicy<float> {
    *
    * @param[in] timeout Timeout in microseconds
    */
-  virtual std::optional<VectorT> GetResult(const size_t timeout = 1000) final;
+  virtual std::optional<VectorT> GetResult(const size_t timeout = 300) final;
 
   virtual void PrintInfo() final;
 
@@ -118,6 +118,7 @@ class HumanoidStandPolicy : public BasePolicy<float> {
   // Logger
   bool log_flag_ = false;
   CsvLogger::Ptr csv_logger_;
+  float inference_time_ = 0;
 };
 }  // namespace ovinf
 

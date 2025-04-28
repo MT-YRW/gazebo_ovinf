@@ -173,7 +173,7 @@ std::optional<HumanoidPolicy::VectorT> HumanoidPolicy::GetResult(
   if (inference_done_.load()) [[unlikely]] {
     return latest_target_;
   } else {
-    std::this_thread::sleep_for(std::chrono ::microseconds(timeout));
+    std::this_thread::sleep_for(std::chrono::microseconds(timeout));
     if (inference_done_.load()) [[likely]] {
       return latest_target_;
     }
@@ -223,6 +223,7 @@ void HumanoidPolicy::WorkerThread() {
           infer_end_time_ - infer_start_time_;
       // std::cout << "Inference time: " << elapsed_seconds.count() * 1000
       //           << "ms" << std::endl;
+      inference_time_ = elapsed_seconds.count() * 1000;
 
       VectorT action_eigen =
           Eigen::Map<VectorT>(action_tensor.data<float>(), action_size_);
@@ -231,7 +232,7 @@ void HumanoidPolicy::WorkerThread() {
       latest_target_ = action_eigen * action_scale_ + joint_default_position_;
     }
     inference_done_.store(true);
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    std::this_thread::sleep_for(std::chrono::microseconds(10));
   }
 }
 
@@ -279,6 +280,7 @@ void HumanoidPolicy::CreateLog(YAML::Node const &config) {
   headers.push_back("prog_gravity_x");
   headers.push_back("prog_gravity_y");
   headers.push_back("prog_gravity_z");
+  headers.push_back("inference_time_ms");
 
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
@@ -314,6 +316,7 @@ void HumanoidPolicy::WriteLog(
   for (size_t i = 0; i < 3; ++i) {
     datas.push_back(obs_pack.proj_gravity(i));
   }
+  datas.push_back(inference_time_);
 
   csv_logger_->Write(datas);
 }
