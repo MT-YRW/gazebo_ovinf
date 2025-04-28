@@ -187,6 +187,7 @@ class RobotHhfcMj : public RobotBase<float> {
  private:
   std::vector<MotorPtr> motors_ = {};
   ImuPtr imu_;
+  Kernel::ExtraData* extra_data_;
   // std::vector<AnklePtr> ankles_;
 };
 
