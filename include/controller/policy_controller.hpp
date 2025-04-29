@@ -90,8 +90,9 @@ class PolicyController : public ControllerBase<float> {
         for (size_t i = 0; i < 12; i++) {
           robot_->executor_->JointTargetPosition()[i] = target_pos.value()[i];
         }
-        robot_->executor_->JointTargetPosition()[12] = 0.0;
-        robot_->executor_->JointTargetPosition()[13] = 0.0;
+        for (size_t i = 12; i < robot_->joint_size_; i++) {
+          robot_->executor_->JointTargetPosition()[12] = 0.0;
+        }
       } else {
         // std::cout << "target pos is empty" << std::endl;
       }

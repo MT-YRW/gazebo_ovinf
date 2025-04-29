@@ -47,6 +47,12 @@ HumanoidStandPolicy::HumanoidStandPolicy(const YAML::Node &config)
   last_action_ = VectorT(12).setZero();
   latest_target_ = VectorT(12).setZero();
 
+  // Create logger
+  log_flag_ = config["log_data"].as<bool>();
+  if (log_flag_) {
+    CreateLog(config);
+  }
+
   // Create model
   compiled_model_ = ov::Core().compile_model(model_path_, device_);
   if (compiled_model_.input().get_element_type() != ov::element::f32) {
@@ -162,6 +168,11 @@ bool HumanoidStandPolicy::InferUnsync(
 
     infer_request_.set_input_tensor(input_tensor);
     inference_done_.store(false);
+
+    if (log_flag_) {
+      WriteLog(obs_pack);
+    }
+
     return true;
   }
 }
