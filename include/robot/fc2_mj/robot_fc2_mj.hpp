@@ -11,17 +11,17 @@
 
 namespace ovinf {
 
-class RobotHhfcMj : public RobotBase<float> {
+class RobotFc2Mj : public RobotBase<float> {
   using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;
 
  public:
-  using Ptr = std::shared_ptr<RobotHhfcMj>;
+  using Ptr = std::shared_ptr<RobotFc2Mj>;
 
  private:
-  class ObserverHhfcMj : public ObserverBase {
+  class ObserverFc2Mj : public ObserverBase {
    public:
-    ObserverHhfcMj() = delete;
-    ObserverHhfcMj(RobotBase<float>* robot, const YAML::Node& config)
+    ObserverFc2Mj() = delete;
+    ObserverFc2Mj(RobotBase<float>* robot, const YAML::Node& config)
         : ObserverBase(robot, config) {
       // Create Filter
       motor_pos_filter_ =
@@ -40,7 +40,7 @@ class RobotHhfcMj : public RobotBase<float> {
     }
 
     virtual bool Update() final {
-      auto robot_mj = dynamic_cast<RobotHhfcMj*>(robot_);
+      auto robot_mj = dynamic_cast<RobotFc2Mj*>(robot_);
 
       for (size_t i = 0; i < motor_size_; ++i) {
         motor_actual_position_[i] = robot_mj->motors_[i]->GetActualPosition() *
@@ -96,10 +96,10 @@ class RobotHhfcMj : public RobotBase<float> {
     CsvLogger::Ptr csv_logger_;
   };
 
-  class ExecutorHhfcMj : public ExecutorBase {
+  class ExecutorFc2Mj : public ExecutorBase {
    public:
-    ExecutorHhfcMj() = delete;
-    ExecutorHhfcMj(RobotBase<float>* robot, const YAML::Node& config)
+    ExecutorFc2Mj() = delete;
+    ExecutorFc2Mj(RobotBase<float>* robot, const YAML::Node& config)
         : ExecutorBase(robot, config) {}
 
     virtual bool ExecuteJointTorque() final {
@@ -111,7 +111,7 @@ class RobotHhfcMj : public RobotBase<float> {
     }
 
     virtual bool ExecuteMotorTorque() final {
-      auto robot_mj = dynamic_cast<RobotHhfcMj*>(robot_);
+      auto robot_mj = dynamic_cast<RobotFc2Mj*>(robot_);
       for (size_t i = 0; i < motor_size_; ++i) {
         // Torque limit
         if (motor_target_torque_[i] > torque_limit_[i]) {
@@ -150,12 +150,12 @@ class RobotHhfcMj : public RobotBase<float> {
   };
 
  public:
-  RobotHhfcMj() = delete;
-  RobotHhfcMj(const YAML::Node& config) : RobotBase(config) {
+  RobotFc2Mj() = delete;
+  RobotFc2Mj(const YAML::Node& config) : RobotBase(config) {
     motors_.resize(motor_size_);
-    this->observer_ = std::make_shared<ObserverHhfcMj>((RobotBase<float>*)this,
+    this->observer_ = std::make_shared<ObserverFc2Mj>((RobotBase<float>*)this,
                                                        config["observer"]);
-    this->executor_ = std::make_shared<ExecutorHhfcMj>((RobotBase<float>*)this,
+    this->executor_ = std::make_shared<ExecutorFc2Mj>((RobotBase<float>*)this,
                                                        config["executor"]);
   }
 
@@ -191,7 +191,7 @@ class RobotHhfcMj : public RobotBase<float> {
   // std::vector<AnklePtr> ankles_;
 };
 
-void RobotHhfcMj::GetDevice(const KernelBus& bus) {
+void RobotFc2Mj::GetDevice(const KernelBus& bus) {
   motors_[LHipYawMotor] = bus.GetDevice<MotorDevice>(0).value();
   motors_[LHipRollMotor] = bus.GetDevice<MotorDevice>(1).value();
   motors_[LHipPitchMotor] = bus.GetDevice<MotorDevice>(2).value();
@@ -219,7 +219,7 @@ void RobotHhfcMj::GetDevice(const KernelBus& bus) {
   imu_ = bus.GetDevice<ImuDevice>(20).value();
 }
 
-void RobotHhfcMj::ObserverHhfcMj::CreateLog(YAML::Node const& config) {
+void RobotFc2Mj::ObserverFc2Mj::CreateLog(YAML::Node const& config) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   std::tm* now_tm = std::localtime(&now_time);
@@ -306,7 +306,7 @@ void RobotHhfcMj::ObserverHhfcMj::CreateLog(YAML::Node const& config) {
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
 
-void RobotHhfcMj::ObserverHhfcMj::WriteLog() {
+void RobotFc2Mj::ObserverFc2Mj::WriteLog() {
   std::vector<CsvLogger::Number> datas;
 
   // Motor actual pos
