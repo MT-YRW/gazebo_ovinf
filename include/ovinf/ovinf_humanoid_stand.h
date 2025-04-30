@@ -26,7 +26,7 @@
 #include "readerwriterqueue.h"
 #include "utils/csv_logger.hpp"
 #include "utils/history_buffer.hpp"
-#include "utils/realtime_setting.hpp"
+#include "utils/realtime_setting.h"
 
 namespace ovinf {
 

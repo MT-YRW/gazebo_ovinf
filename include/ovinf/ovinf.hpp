@@ -4,6 +4,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Core>
+#include <filesystem>
 #include <openvino/openvino.hpp>
 
 namespace ovinf {

@@ -170,13 +170,16 @@ bool HumanoidPolicy::InferUnsync(
 
 std::optional<HumanoidPolicy::VectorT> HumanoidPolicy::GetResult(
     const size_t timeout) {
-  if (inference_done_.load()) [[unlikely]] {
+  if (inference_done_.load()) {
+    std::cout << "test 1" << latest_target_.transpose() << std::endl;
     return latest_target_;
   } else {
     std::this_thread::sleep_for(std::chrono::microseconds(timeout));
-    if (inference_done_.load()) [[likely]] {
+    if (inference_done_.load()) {
+      std::cout << "test 2" << std::endl;
       return latest_target_;
     }
+    std::cout << "test 3" << std::endl;
     return std::nullopt;
   }
 }
