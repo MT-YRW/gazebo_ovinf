@@ -4,8 +4,10 @@ project(ovinf)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# TODO: This casues memory corruption on AMD cpu. fix this! Dknt 4.10
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+
+# If march=native is turned on, you should add the same flag to the root project.
+# Otherwise, you may get memory double free error.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 # set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/home/dknt/Library/openvino-2025.0.0/runtime/cmake")
 # set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/home/dknt/Library/openvino_u24_2025.1.0/runtime/cmake")

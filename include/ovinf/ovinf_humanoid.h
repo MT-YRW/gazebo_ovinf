@@ -37,6 +37,8 @@ class HumanoidPolicy : public BasePolicy<float> {
   using MatrixT = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>;
   using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
  public:
   HumanoidPolicy() = delete;
   ~HumanoidPolicy();

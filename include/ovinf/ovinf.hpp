@@ -25,6 +25,8 @@ struct ProprioceptiveObservation {
 
 template <typename T = float>
 class BasePolicy {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
  public:
   using BasePolicyPtr = std::shared_ptr<BasePolicy<T>>;
 
