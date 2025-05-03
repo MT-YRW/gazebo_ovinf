@@ -246,8 +246,9 @@ class RobotHhfcCifx : public RobotBase<float> {
         (RobotBase<float>*)this, config["executor"]);
 
     // Create ankle resolver from yaml config file
+    this->ankles_.resize(2);
     this->ankles_[LEFT] = AnkleFromYaml(config["ankle_left"]);
-    this->ankles_[RIGHT] = AnkleFromYaml(config["ankle_left"]);
+    this->ankles_[RIGHT] = AnkleFromYaml(config["ankle_right"]);
   }
 
   AnklePtr AnkleFromYaml(YAML::Node const& config) {
