@@ -30,7 +30,7 @@ class ZeroPosController : public ControllerBase<float> {
   virtual void WarmUp() final {}
 
   virtual void Init() final {
-    start_pos_ = this->robot_->observer_->JointActualPosition();
+    start_pos_ = this->robot_->Observer()->JointActualPosition();
     start_time_ = std::chrono::high_resolution_clock::now();
     ready_ = true;
   }
@@ -50,7 +50,7 @@ class ZeroPosController : public ControllerBase<float> {
     VectorT temp_target = start_pos_ + ratio * (zero_pos_ - start_pos_);
 
     if (set_target) {
-      robot_->executor_->JointTargetPosition() = temp_target;
+      robot_->Executor()->JointTargetPosition() = temp_target;
       ComputeJointPd();
     }
   }

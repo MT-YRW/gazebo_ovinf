@@ -42,13 +42,13 @@ class ControllerBase {
  protected:
   void ComputeJointPd() {
     for (size_t i = 0; i < robot_->joint_size_; ++i) {
-      T position_error = robot_->executor_->JointTargetPosition()[i] -
-                         robot_->observer_->JointActualPosition()[i];
+      T position_error = robot_->Executor()->JointTargetPosition()[i] -
+                         robot_->Observer()->JointActualPosition()[i];
 
-      robot_->executor_->JointTargetTorque()[i] =
+      robot_->Executor()->JointTargetTorque()[i] =
           p_gains_(i) * position_error;  // P
-      robot_->executor_->JointTargetTorque()[i] +=
-          -d_gains_(i) * robot_->observer_->JointActualVelocity()[i];  // D
+      robot_->Executor()->JointTargetTorque()[i] +=
+          -d_gains_(i) * robot_->Observer()->JointActualVelocity()[i];  // D
     }
   }
 

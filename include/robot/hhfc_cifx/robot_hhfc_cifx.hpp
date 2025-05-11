@@ -106,13 +106,13 @@ class RobotHhfcCifx : public RobotBase<float> {
             joint_actual_velocity_[RAnkleRollJoint] / M_PI * 180.0);
 
         robot_cifx->extra_data_->Set<"l_p_tor">(
-            robot_cifx->executor_->JointTargetTorque()[LAnklePitchJoint]);
+            robot_cifx->Executor()->JointTargetTorque()[LAnklePitchJoint]);
         robot_cifx->extra_data_->Set<"l_r_tor">(
-            robot_cifx->executor_->JointTargetTorque()[LAnkleRollJoint]);
+            robot_cifx->Executor()->JointTargetTorque()[LAnkleRollJoint]);
         robot_cifx->extra_data_->Set<"r_p_tor">(
-            robot_cifx->executor_->JointTargetTorque()[RAnklePitchJoint]);
+            robot_cifx->Executor()->JointTargetTorque()[RAnklePitchJoint]);
         robot_cifx->extra_data_->Set<"r_r_tor">(
-            robot_cifx->executor_->JointTargetTorque()[RAnklePitchJoint]);
+            robot_cifx->Executor()->JointTargetTorque()[RAnklePitchJoint]);
       }
 
       // cifx imu returns angles in degree
@@ -208,10 +208,10 @@ class RobotHhfcCifx : public RobotBase<float> {
         }
 
         // Position limit
-        if (robot_->observer_->MotorActualPosition()[i] >
+        if (robot_->Observer()->MotorActualPosition()[i] >
             motor_upper_limit_[i]) {
           motor_target_torque_[i] = 0.0;
-        } else if (robot_->observer_->MotorActualPosition()[i] <
+        } else if (robot_->Observer()->MotorActualPosition()[i] <
                    motor_lower_limit_[i]) {
           motor_target_torque_[i] = 0.0;
         }
@@ -284,11 +284,11 @@ class RobotHhfcCifx : public RobotBase<float> {
       std::cout << "  - direction: " << motor_direction_(pair.second, 0)
                 << std::endl;
       std::cout << "  - upper limit: "
-                << executor_->MotorUpperLimit()(pair.second, 0) << std::endl;
+                << Executor()->MotorUpperLimit()(pair.second, 0) << std::endl;
       std::cout << "  - lower limit: "
-                << executor_->MotorLowerLimit()(pair.second, 0) << std::endl;
+                << Executor()->MotorLowerLimit()(pair.second, 0) << std::endl;
       std::cout << "  - torque limit: "
-                << executor_->TorqueLimit()(pair.second, 0) << std::endl;
+                << Executor()->TorqueLimit()(pair.second, 0) << std::endl;
     }
     for (auto const& pair : joint_names_) {
       std::cout << "Joint id: " << pair.second << " name: " << pair.first
@@ -436,22 +436,22 @@ void RobotHhfcCifx::ObserverHhfcCifx::WriteLog() {
 
   // Motor target pos
   for (size_t i = 0; i < motor_size_; ++i) {
-    datas.push_back(robot_->executor_->MotorTargetPosition()[i]);
+    datas.push_back(robot_->Executor()->MotorTargetPosition()[i]);
   }
 
   // Motor target torque
   for (size_t i = 0; i < motor_size_; ++i) {
-    datas.push_back(robot_->executor_->MotorTargetTorque()[i]);
+    datas.push_back(robot_->Executor()->MotorTargetTorque()[i]);
   }
 
   // Joint target pos
   for (size_t i = 0; i < joint_size_; ++i) {
-    datas.push_back(robot_->executor_->JointTargetPosition()[i]);
+    datas.push_back(robot_->Executor()->JointTargetPosition()[i]);
   }
 
   // Joint target torque
   for (size_t i = 0; i < joint_size_; ++i) {
-    datas.push_back(robot_->executor_->JointTargetTorque()[i]);
+    datas.push_back(robot_->Executor()->JointTargetTorque()[i]);
   }
 
   // Acc

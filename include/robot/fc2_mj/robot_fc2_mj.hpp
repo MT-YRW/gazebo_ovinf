@@ -121,10 +121,10 @@ class RobotFc2Mj : public RobotBase<float> {
         }
 
         // Position limit
-        if (robot_->observer_->MotorActualPosition()[i] >
+        if (robot_->Observer()->MotorActualPosition()[i] >
             motor_upper_limit_[i]) {
           motor_target_torque_[i] = 0.0;
-        } else if (robot_->observer_->MotorActualPosition()[i] <
+        } else if (robot_->Observer()->MotorActualPosition()[i] <
                    motor_lower_limit_[i]) {
           motor_target_torque_[i] = 0.0;
         }
@@ -154,9 +154,9 @@ class RobotFc2Mj : public RobotBase<float> {
   RobotFc2Mj(const YAML::Node& config) : RobotBase(config) {
     motors_.resize(motor_size_);
     this->observer_ = std::make_shared<ObserverFc2Mj>((RobotBase<float>*)this,
-                                                       config["observer"]);
+                                                      config["observer"]);
     this->executor_ = std::make_shared<ExecutorFc2Mj>((RobotBase<float>*)this,
-                                                       config["executor"]);
+                                                      config["executor"]);
   }
 
   inline void GetDevice(const KernelBus& bus);
@@ -172,11 +172,11 @@ class RobotFc2Mj : public RobotBase<float> {
       std::cout << "  - direction: " << motor_direction_(pair.second, 0)
                 << std::endl;
       std::cout << "  - upper limit: "
-                << executor_->MotorUpperLimit()(pair.second, 0) << std::endl;
+                << Executor()->MotorUpperLimit()(pair.second, 0) << std::endl;
       std::cout << "  - lower limit: "
-                << executor_->MotorLowerLimit()(pair.second, 0) << std::endl;
+                << Executor()->MotorLowerLimit()(pair.second, 0) << std::endl;
       std::cout << "  - torque limit: "
-                << executor_->TorqueLimit()(pair.second, 0) << std::endl;
+                << Executor()->TorqueLimit()(pair.second, 0) << std::endl;
     }
     for (auto const& pair : joint_names_) {
       std::cout << "Joint id: " << pair.second << " name: " << pair.first
@@ -331,22 +331,22 @@ void RobotFc2Mj::ObserverFc2Mj::WriteLog() {
 
   // Motor target pos
   for (size_t i = 0; i < motor_size_; ++i) {
-    datas.push_back(robot_->executor_->MotorTargetPosition()[i]);
+    datas.push_back(robot_->Executor()->MotorTargetPosition()[i]);
   }
 
   // Motor target torque
   for (size_t i = 0; i < motor_size_; ++i) {
-    datas.push_back(robot_->executor_->MotorTargetTorque()[i]);
+    datas.push_back(robot_->Executor()->MotorTargetTorque()[i]);
   }
 
   // Joint target pos
   for (size_t i = 0; i < joint_size_; ++i) {
-    datas.push_back(robot_->executor_->JointTargetPosition()[i]);
+    datas.push_back(robot_->Executor()->JointTargetPosition()[i]);
   }
 
   // Joint target torque
   for (size_t i = 0; i < joint_size_; ++i) {
-    datas.push_back(robot_->executor_->JointTargetTorque()[i]);
+    datas.push_back(robot_->Executor()->JointTargetTorque()[i]);
   }
 
   // Acc
