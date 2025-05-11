@@ -13,6 +13,8 @@ namespace ovinf {
 
 class RobotHhfcMj : public RobotBase<float> {
   using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+  friend class ObserverHhfcMj;
+  friend class ExecutorHhfcMj;
 
  public:
   using Ptr = std::shared_ptr<RobotHhfcMj>;
@@ -121,10 +123,10 @@ class RobotHhfcMj : public RobotBase<float> {
         }
 
         // Position limit
-        if (robot_->observer_->MotorActualPosition()[i] >
+        if (robot_->Observer()->MotorActualPosition()[i] >
             motor_upper_limit_[i]) {
           motor_target_torque_[i] = 0.0;
-        } else if (robot_->observer_->MotorActualPosition()[i] <
+        } else if (robot_->Observer()->MotorActualPosition()[i] <
                    motor_lower_limit_[i]) {
           motor_target_torque_[i] = 0.0;
         }
@@ -324,22 +326,22 @@ void RobotHhfcMj::ObserverHhfcMj::WriteLog() {
 
   // Motor target pos
   for (size_t i = 0; i < motor_size_; ++i) {
-    datas.push_back(robot_->executor_->MotorTargetPosition()[i]);
+    datas.push_back(robot_->Executor()->MotorTargetPosition()[i]);
   }
 
   // Motor target torque
   for (size_t i = 0; i < motor_size_; ++i) {
-    datas.push_back(robot_->executor_->MotorTargetTorque()[i]);
+    datas.push_back(robot_->Executor()->MotorTargetTorque()[i]);
   }
 
   // Joint target pos
   for (size_t i = 0; i < joint_size_; ++i) {
-    datas.push_back(robot_->executor_->JointTargetPosition()[i]);
+    datas.push_back(robot_->Executor()->JointTargetPosition()[i]);
   }
 
   // Joint target torque
   for (size_t i = 0; i < joint_size_; ++i) {
-    datas.push_back(robot_->executor_->JointTargetTorque()[i]);
+    datas.push_back(robot_->Executor()->JointTargetTorque()[i]);
   }
 
   // Acc

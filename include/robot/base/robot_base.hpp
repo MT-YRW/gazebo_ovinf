@@ -14,6 +14,8 @@ namespace ovinf {
 template <typename T = float>
 class RobotBase {
   using VectorT = Eigen::Matrix<T, Eigen::Dynamic, 1>;
+  friend class ObserverBase;
+  friend class ExecutorBase;
 
  public:
   using RobotPtr = std::shared_ptr<RobotBase<T>>;
@@ -167,6 +169,9 @@ class RobotBase {
 
   virtual void PrintInfo() = 0;
 
+  ObserverBase::ObserverPtr Observer() { return observer_; }
+  ExecutorBase::ExecutorPtr Executor() { return executor_; }
+
  public:
   std::string robot_name_;
   std::map<std::string, size_t> joint_names_;  // joint name to index
@@ -175,6 +180,7 @@ class RobotBase {
   size_t joint_size_ = 0;
   size_t motor_size_ = 0;
 
+ protected:
   typename ObserverBase::ObserverPtr observer_;
   typename ExecutorBase::ExecutorPtr executor_;
 };
