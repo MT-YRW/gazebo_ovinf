@@ -115,18 +115,48 @@ class RobotHhfcCifx : public RobotBase<float> {
             robot_cifx->Executor()->JointTargetTorque()[RAnklePitchJoint]);
       }
 
+      // Anti-parallellogram linkage handle
+      if constexpr (true) {
+        joint_actual_position_[LKneeJoint] =
+            robot_cifx->ap_linkages_[LEFT]->ForwardKinematics(
+                motor_actual_position_[LKneeMotor]);
+        joint_actual_position_[RKneeJoint] =
+            robot_cifx->ap_linkages_[RIGHT]->ForwardKinematics(
+                motor_actual_position_[RKneeMotor]);
+
+        joint_actual_velocity_[LKneeJoint] =
+            robot_cifx->ap_linkages_[LEFT]->VelocityMapping(
+                motor_actual_velocity_[LKneeMotor]);
+        joint_actual_velocity_[RKneeJoint] =
+            robot_cifx->ap_linkages_[RIGHT]->VelocityMapping(
+                motor_actual_velocity_[RKneeMotor]);
+
+        robot_cifx->extra_data_->Set<"l_knee_pos">(
+            joint_actual_position_[LKneeJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"r_knee_pos">(
+            joint_actual_position_[RKneeJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"l_knee_vel">(
+            joint_actual_velocity_[LKneeJoint] / M_PI * 180.0);
+        robot_cifx->extra_data_->Set<"r_knee_vel">(
+            joint_actual_velocity_[RKneeJoint] / M_PI * 180.0);
+      }
+
       // cifx imu returns angles in degree
       euler_rpy_ = eluer_rpy_filter_->Filter(
-          Eigen::Vector3f(robot_cifx->imu_->GetRoll() / 180 * M_PI,
-                          robot_cifx->imu_->GetPitch() / 180 * M_PI,
-                          robot_cifx->imu_->GetYaw() / 180 * M_PI));
+          (VectorT(3) << robot_cifx->imu_->GetRoll() / 180 * M_PI,
+           robot_cifx->imu_->GetPitch() / 180 * M_PI,
+           robot_cifx->imu_->GetYaw() / 180 * M_PI)
+              .finished());
 
-      acceleration_ = acc_filter_->Filter(Eigen::Vector3f(
-          robot_cifx->imu_->GetAccX(), robot_cifx->imu_->GetAccY(),
-          robot_cifx->imu_->GetAccZ()));
-      angular_velocity_ = ang_vel_filter_->Filter(Eigen::Vector3f(
-          robot_cifx->imu_->GetGyroX(), robot_cifx->imu_->GetGyroY(),
-          robot_cifx->imu_->GetGyroZ()));
+      acceleration_ = acc_filter_->Filter(
+          (VectorT(3) << robot_cifx->imu_->GetAccX(),
+           robot_cifx->imu_->GetAccY(), robot_cifx->imu_->GetAccZ())
+              .finished());
+
+      angular_velocity_ = ang_vel_filter_->Filter(
+          (VectorT(3) << robot_cifx->imu_->GetGyroX(),
+           robot_cifx->imu_->GetGyroY(), robot_cifx->imu_->GetGyroZ())
+              .finished());
 
       Eigen::Matrix3f Rwb(
           Eigen::AngleAxisf(euler_rpy_[2], Eigen::Vector3f::UnitZ()) *
@@ -193,6 +223,23 @@ class RobotHhfcCifx : public RobotBase<float> {
         motor_target_torque_[RAnkleShortMotor] = right_mot_target_tor[0];
       }
 
+      // Anti-parallellogram linkage handle
+      if constexpr (true) {
+        motor_target_position_[LKneeJoint] =
+            robot_cifx->ap_linkages_[LEFT]->InverseKinematics(
+                joint_target_position_[LKneeJoint]);
+        motor_target_position_[RKneeJoint] =
+            robot_cifx->ap_linkages_[RIGHT]->InverseKinematics(
+                joint_target_position_[RKneeJoint]);
+
+        motor_target_torque_[LKneeJoint] =
+            robot_cifx->ap_linkages_[LEFT]->TorqueRemapping(
+                joint_target_torque_[LKneeJoint]);
+        motor_target_torque_[RKneeJoint] =
+            robot_cifx->ap_linkages_[RIGHT]->TorqueRemapping(
+                joint_target_torque_[RKneeJoint]);
+      }
+
       ExecuteMotorTorque();
       return true;
     }
@@ -249,6 +296,10 @@ class RobotHhfcCifx : public RobotBase<float> {
     this->ankles_.resize(2);
     this->ankles_[LEFT] = AnkleFromYaml(config["ankle_left"]);
     this->ankles_[RIGHT] = AnkleFromYaml(config["ankle_right"]);
+
+    this->ap_linkages_.resize(2);
+    this->ap_linkages_[LEFT] = ApLinkageFromYaml(config["ap_linkage_left"]);
+    this->ap_linkages_[RIGHT] = ApLinkageFromYaml(config["ap_linkage_right"]);
   }
 
   AnklePtr AnkleFromYaml(YAML::Node const& config) {
@@ -264,6 +315,14 @@ class RobotHhfcCifx : public RobotBase<float> {
         .r_b2_0 = Yaml2Eigen(config["r_b2_0"]),
         .r_c2_0 = Yaml2Eigen(config["r_c2_0"]),
     });
+  }
+
+  APLPtr ApLinkageFromYaml(YAML::Node const& config) {
+    return std::make_shared<APLT>(
+        APLT::APLParameters{.r = config["r"].as<float>(),
+                            .l = config["l"].as<float>(),
+                            .theta_bias = config["theta_bias"].as<float>(),
+                            .phi_bias = config["phi_bias"].as<float>()});
   }
 
   inline VectorT Yaml2Eigen(YAML::Node const& config) {
@@ -300,6 +359,7 @@ class RobotHhfcCifx : public RobotBase<float> {
   std::vector<MotorPtr> motors_ = {};
   ImuPtr imu_;
   std::vector<AnklePtr> ankles_;
+  std::vector<APLPtr> ap_linkages_;
   Kernel::ExtraData* extra_data_;
 };
 

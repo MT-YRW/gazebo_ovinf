@@ -4,6 +4,7 @@
 #include "bitbot_cifx/device/imu_mti300.h"
 #include "bitbot_cifx/device/joint_elmo.h"
 #include "bitbot_cifx/kernel/cifx_kernel.hpp"
+#include "utils/antiparallelogram.hpp"
 #include "utils/parallel_ankle.hpp"
 
 namespace ovinf {
@@ -64,12 +65,15 @@ using MotorDevice = bitbot::JointElmo;
 using MotorPtr = MotorDevice*;
 using AnkleT = ovinf::ParallelAnkle<float>;
 using AnklePtr = std::shared_ptr<AnkleT>;
+using APLT = ovinf::AntiparallelogramLinkage<float>;
+using APLPtr = std::shared_ptr<APLT>;
 
 struct UserData {};
 
 using Kernel =
     bitbot::CifxKernel<UserData, "l_p_pos", "l_p_vel", "l_r_pos", "l_r_vel",
                        "r_p_pos", "r_p_vel", "r_r_pos", "r_r_vel", "l_p_tor",
-                       "l_r_tor", "r_p_tor", "r_r_tor">;
+                       "l_r_tor", "r_p_tor", "r_r_tor", "l_knee_pos",
+                       "r_knee_pos", "l_knee_vel", "r_knee_vel">;
 
 #endif  // !HHFC_CIFX_COMMON_HPP

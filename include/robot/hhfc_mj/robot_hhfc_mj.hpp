@@ -60,15 +60,19 @@ class RobotHhfcMj : public RobotBase<float> {
       joint_actual_velocity_ = motor_actual_velocity_;
 
       euler_rpy_ = eluer_rpy_filter_->Filter(
-          Eigen::Vector3f(robot_mj->imu_->GetRoll(), robot_mj->imu_->GetPitch(),
-                          robot_mj->imu_->GetYaw()));
+          (VectorT(3) << robot_mj->imu_->GetRoll(), robot_mj->imu_->GetPitch(),
+           robot_mj->imu_->GetYaw())
+              .finished());
 
       acceleration_ = acc_filter_->Filter(
-          Eigen::Vector3f(robot_mj->imu_->GetAccX(), robot_mj->imu_->GetAccY(),
-                          robot_mj->imu_->GetAccZ()));
-      angular_velocity_ = ang_vel_filter_->Filter(Eigen::Vector3f(
-          robot_mj->imu_->GetGyroX(), robot_mj->imu_->GetGyroY(),
-          robot_mj->imu_->GetGyroZ()));
+          (VectorT(3) << robot_mj->imu_->GetAccX(), robot_mj->imu_->GetAccY(),
+           robot_mj->imu_->GetAccZ())
+              .finished());
+
+      angular_velocity_ = ang_vel_filter_->Filter(
+          (VectorT(3) << robot_mj->imu_->GetGyroX(), robot_mj->imu_->GetGyroY(),
+           robot_mj->imu_->GetGyroZ())
+              .finished());
 
       Eigen::Matrix3f Rwb(
           Eigen::AngleAxisf(euler_rpy_[2], Eigen::Vector3f::UnitZ()) *

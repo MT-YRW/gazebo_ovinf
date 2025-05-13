@@ -34,18 +34,22 @@ class PolicyController : public ControllerBase<float> {
   }
 
   virtual void WarmUp() final {
-    inference_net_->WarmUp(
-        {.command = command_,
-         .ang_vel = robot_->Observer()->AngularVelocity(),
-         .proj_gravity = robot_->Observer()->ProjGravity(),
-         .joint_pos = robot_->Observer()->JointActualPosition().segment(0, 12),
-         .joint_vel =
-             robot_->Observer()->JointActualVelocity().segment(0, 12)});
+    if (counter_++ % decimation_ == 0) {
+      inference_net_->WarmUp(
+          {.command = command_,
+           .ang_vel = robot_->Observer()->AngularVelocity(),
+           .proj_gravity = robot_->Observer()->ProjGravity(),
+           .joint_pos =
+               robot_->Observer()->JointActualPosition().segment(0, 12),
+           .joint_vel =
+               robot_->Observer()->JointActualVelocity().segment(0, 12)});
+    }
     // inference_net_->PrintInfo();
   }
 
   virtual void Init() final {
     counter_ = 0;
+    command_ = VectorT::Zero(3);
     ready_ = true;
   }
 
@@ -54,26 +58,6 @@ class PolicyController : public ControllerBase<float> {
       std::cerr << "PolicyController not ready" << std::endl;
       return;
     }
-
-    // TODO: Test vel filter
-    // static MeanFilter<VectorT> vel_filter(YAML::Load(R"(
-    //   type: "Mean"
-    //   history_length: 3
-    //   lower_bound: [-50.0, -50.0, -50.0, -50.0, -50.0, -50.0,
-    //                 -50.0, -50.0, -50.0, -50.0, -50.0, -50.0]
-    //   upper_bound: [50.0, 50.0, 50.0, 50.0, 50.0, 50.0,
-    //                 50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
-    // )"));
-    //
-    // if (counter_++ % decimation_ == 0) {
-    //   auto err = inference_net_->InferUnsync(
-    //       {.command = command_,
-    //        .ang_vel = robot_->Observer()->AngularVelocity(),
-    //        .proj_gravity = robot_->Observer()->ProjGravity(),
-    //        .joint_pos = robot_->Observer()->JointActualPosition().segment(0,
-    //        12), .joint_vel = vel_filter.Filter(
-    //            robot_->Observer()->JointActualVelocity().segment(0, 12))});
-    // }
 
     if (counter_++ % decimation_ == 0) {
       auto err = inference_net_->InferUnsync(
@@ -93,7 +77,7 @@ class PolicyController : public ControllerBase<float> {
           robot_->Executor()->JointTargetPosition()[i] = target_pos.value()[i];
         }
         for (size_t i = 12; i < robot_->joint_size_; i++) {
-          robot_->Executor()->JointTargetPosition()[12] = 0.0;
+          robot_->Executor()->JointTargetPosition()[i] = 0.0;
         }
       } else {
         // std::cout << "target pos is empty" << std::endl;
@@ -102,7 +86,10 @@ class PolicyController : public ControllerBase<float> {
     }
   }
 
-  virtual void Stop() final { ready_ = false; }
+  virtual void Stop() final {
+    command_ = VectorT::Zero(3);
+    ready_ = false;
+  }
 
   VectorT& GetCommand() { return command_; }
 
