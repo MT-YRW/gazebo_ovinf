@@ -45,8 +45,7 @@ class BasePolicy {
    * @param[in] num_itrations Warmup iterations
    * @return Is warmup done successfully.
    */
-  virtual bool WarmUp(const ProprioceptiveObservation<T> &obs,
-                      size_t num_iterations = 20) = 0;
+  virtual bool WarmUp(const ProprioceptiveObservation<T> &obs) = 0;
 
   /**
    * @brief Set observation, run inference.

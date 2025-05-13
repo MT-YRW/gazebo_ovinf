@@ -25,3 +25,5 @@ add_executable(filter_test filter_test.cc)
 target_link_libraries(filter_test
   ovinf
 )
+
+add_executable(apl_test apl_test.cc)

@@ -1,4 +1,5 @@
 inference:
+  log_data: false
   policy_type: "Humanoid"
   model_path: "/home/dknt/Project/dl_deploy/ovinf/model/humanoid.onnx"
   device: "CPU"

@@ -9,15 +9,16 @@ int main() {
 
   auto policy = ovinf::PolicyFactory::CreatePolicy(config["inference"]);
 
-  policy->WarmUp(
-      {
-          .command = Eigen::Vector3f{0.0, 0.0, 0.0},
-          .ang_vel = Eigen::Vector3f{0.0, 0.0, 0.0},
-          .proj_gravity = Eigen::Vector3f{0.0, 0.0, 0.0},
-          .joint_pos = Eigen::VectorXf::Zero(12),
-          .joint_vel = Eigen::VectorXf::Zero(12),
-      },
-      20);
+  for (size_t i = 0; i < 20; ++i) {
+    policy->WarmUp({
+        .command = Eigen::Vector3f{0.0, 0.0, 0.0},
+        .ang_vel = Eigen::Vector3f{0.0, 0.0, 0.0},
+        .proj_gravity = Eigen::Vector3f{0.0, 0.0, 0.0},
+        .joint_pos = Eigen::VectorXf::Zero(12),
+        .joint_vel = Eigen::VectorXf::Zero(12),
+    });
+    while (!policy->GetResult().has_value());
+  }
 
   bool status;
   status = policy->InferUnsync({

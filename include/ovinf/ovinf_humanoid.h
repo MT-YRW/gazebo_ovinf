@@ -52,8 +52,7 @@ class HumanoidPolicy : public BasePolicy<float> {
    * @param[in] num_itrations Warmup iterations
    * @return Is warmup done successfully.
    */
-  virtual bool WarmUp(ProprioceptiveObservation<float> const &obs_pack,
-                      size_t num_itrations = 10) final;
+  virtual bool WarmUp(ProprioceptiveObservation<float> const &obs_pack) final;
 
   /**
    * @brief Set observation, run inference.

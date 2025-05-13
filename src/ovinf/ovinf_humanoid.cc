@@ -66,13 +66,13 @@ HumanoidPolicy::HumanoidPolicy(const YAML::Node &config) : BasePolicy(config) {
   worker_thread_ = std::thread(&HumanoidPolicy::WorkerThread, this);
 }
 
-bool HumanoidPolicy::WarmUp(ProprioceptiveObservation<float> const &obs_pack,
-                            size_t num_itrations) {
-  std::chrono::high_resolution_clock::time_point start_time =
-      std::chrono::high_resolution_clock::now();
+bool HumanoidPolicy::WarmUp(ProprioceptiveObservation<float> const &obs_pack) {
+  double gait_time_value = 0.0;
+
   VectorT obs(single_obs_size_);
   obs.setZero();
-  obs.segment(0, 2) = Eigen::Vector2f{0.0, 1.0};
+  obs.segment(0, 2) =
+      Eigen::Vector2f{std::sin(gait_time_value), std::cos(gait_time_value)};
   VectorT command_scaled(3);
   command_scaled.segment(0, 2) =
       obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
@@ -85,32 +85,27 @@ bool HumanoidPolicy::WarmUp(ProprioceptiveObservation<float> const &obs_pack,
   obs.segment(41, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
   obs.segment(44, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
 
-  for (size_t i = 0; i < obs_buffer_size_; ++i) {
+  if (!inference_done_.load()) {
+    input_queue_.enqueue(obs);
+    return false;
+  } else {
+    while (input_queue_.peek() != nullptr) {
+      VectorT old_obs;
+      input_queue_.try_dequeue(old_obs);
+      obs_buffer_->AddObservation(old_obs);
+    }
     obs_buffer_->AddObservation(obs);
-  }
 
-  for (size_t i = 0; i < num_itrations; ++i) {
-    auto input_eigen = obs_buffer_->GetObsHistory();
     ov::Tensor input_tensor(input_info_.get_element_type(),
-                            input_info_.get_shape(), input_eigen.data());
+                            input_info_.get_shape(),
+                            obs_buffer_->GetObsHistory().data());
+    infer_start_time_ = std::chrono::high_resolution_clock::now();
+
     infer_request_.set_input_tensor(input_tensor);
-    infer_request_.start_async();
-    infer_request_.wait();
+    inference_done_.store(false);
 
-    auto action_tensor = infer_request_.get_output_tensor();
-    VectorT action_eigen =
-        Eigen::Map<VectorT>(action_tensor.data<float>(), action_size_);
-
-    last_action_ = action_eigen;
-    obs.segment(29, 12) = last_action_;
-    obs_buffer_->AddObservation(obs);
+    return true;
   }
-
-  std::chrono::duration<double> elapsed_seconds =
-      std::chrono::high_resolution_clock::now() - start_time;
-  // std::cout << "Warm up time: " << elapsed_seconds.count() * 1000 << "ms"
-  //           << std::endl;
-  return true;
 }
 
 bool HumanoidPolicy::InferUnsync(
