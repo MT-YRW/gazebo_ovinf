@@ -118,10 +118,10 @@ class RobotHhfcCifx : public RobotBase<float> {
       // Anti-parallellogram linkage handle
       if constexpr (true) {
         joint_actual_position_[LKneeJoint] =
-            robot_cifx->ap_linkages_[LEFT]->ForwardKinematics(
+            -robot_cifx->ap_linkages_[LEFT]->ForwardKinematics(
                 motor_actual_position_[LKneeMotor]);
         joint_actual_position_[RKneeJoint] =
-            robot_cifx->ap_linkages_[RIGHT]->ForwardKinematics(
+            -robot_cifx->ap_linkages_[RIGHT]->ForwardKinematics(
                 motor_actual_position_[RKneeMotor]);
 
         joint_actual_velocity_[LKneeJoint] =
@@ -227,10 +227,10 @@ class RobotHhfcCifx : public RobotBase<float> {
       if constexpr (true) {
         motor_target_position_[LKneeJoint] =
             robot_cifx->ap_linkages_[LEFT]->InverseKinematics(
-                joint_target_position_[LKneeJoint]);
+                -joint_target_position_[LKneeJoint]);
         motor_target_position_[RKneeJoint] =
             robot_cifx->ap_linkages_[RIGHT]->InverseKinematics(
-                joint_target_position_[RKneeJoint]);
+                -joint_target_position_[RKneeJoint]);
 
         motor_target_torque_[LKneeJoint] =
             robot_cifx->ap_linkages_[LEFT]->TorqueRemapping(

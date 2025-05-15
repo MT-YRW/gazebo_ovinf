@@ -90,7 +90,7 @@ class AntiparallelogramLinkage {
    * @param[in] theta_dot Motor speed in rad/s
    * @return Joint speed
    */
-  T VelocityMapping(const T theta_dot) { return J_ * theta_dot; }
+  T VelocityMapping(const T theta_dot) { return theta_dot / J_; }
 
   /**
    * @brief Torque remapping
