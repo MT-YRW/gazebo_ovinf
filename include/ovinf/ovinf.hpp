@@ -21,6 +21,7 @@ struct ProprioceptiveObservation {
   Eigen::Matrix<T, Eigen::Dynamic, 1> position = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> velocity = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> euler_angles = {};
+  Eigen::Matrix<T, Eigen::Dynamic, 1> custom = {};
 };
 
 template <typename T = float>

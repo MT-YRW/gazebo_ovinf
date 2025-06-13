@@ -16,12 +16,12 @@ find_package(OpenVINO REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-add_library(ovinf SHARED
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/ovinf/ovinf_humanoid.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/ovinf/ovinf_humanoid_stand.cc
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src/utils SRC_UTILS)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src/ovinf SRC_OVINF)
 
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/priority.c
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/stick_core.c
+add_library(ovinf SHARED
+  ${SRC_UTILS}
+  ${SRC_OVINF}
 )
 target_include_directories(ovinf PUBLIC
   ${OpenVINO_INCLUDE_DIRS}

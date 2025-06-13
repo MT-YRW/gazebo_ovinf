@@ -121,7 +121,11 @@ class HumanoidPolicy : public BasePolicy<float> {
   // Logger
   bool log_flag_ = false;
   CsvLogger::Ptr csv_logger_;
+  std::string log_name_;
   float inference_time_ = 0;
+
+  // Realtime
+  size_t stick_to_core_ = 0;
 };
 }  // namespace ovinf
 

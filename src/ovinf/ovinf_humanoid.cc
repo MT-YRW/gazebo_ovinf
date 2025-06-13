@@ -32,6 +32,8 @@ HumanoidPolicy::HumanoidPolicy(const YAML::Node &config) : BasePolicy(config) {
   obs_scale_proj_gravity_ = config["obs_scales"]["proj_gravity"].as<float>();
   clip_action_ = config["clip_action"].as<float>();
   joint_default_position_ = VectorT(joint_names_.size());
+  stick_to_core_ = config["stick_to_core"].as<size_t>();
+  log_name_ = config["log_name"].as<std::string>();
 
   for (auto const &pair : joint_names_) {
     joint_default_position_(pair.second, 0) =
@@ -204,7 +206,7 @@ void HumanoidPolicy::WorkerThread() {
     if (!setProcessHighPriority(99)) {
       std::cerr << "Failed to set process high priority." << std::endl;
     }
-    if (!StickThisThreadToCore(6)) {
+    if (!StickThisThreadToCore(stick_to_core_)) {
       std::cerr << "Failed to stick thread to core." << std::endl;
     }
   }
@@ -221,7 +223,9 @@ void HumanoidPolicy::WorkerThread() {
       inference_time_ = elapsed_seconds.count() * 1000;
 
       VectorT action_eigen =
-          Eigen::Map<VectorT>(action_tensor.data<float>(), action_size_);
+          Eigen::Map<VectorT>(action_tensor.data<float>(), action_size_)
+              .cwiseMin(clip_action_)
+              .cwiseMax(-clip_action_);
 
       last_action_ = action_eigen;
       latest_target_ = action_eigen * action_scale_ + joint_default_position_;
@@ -249,8 +253,8 @@ void HumanoidPolicy::CreateLog(YAML::Node const &config) {
     create_directories(config_file_path);
   }
 
-  std::string logger_file =
-      config_file_path.string() + "/" + current_time + "_humanoid.csv";
+  std::string logger_file = config_file_path.string() + "/" + current_time +
+                            "_humanoid_" + log_name_ + ".csv";
 
   // Get headers
   std::vector<std::string> headers;
