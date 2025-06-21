@@ -83,8 +83,8 @@ class RobotHhfcCifx : public RobotBase<float> {
 
         joint_actual_velocity_[LAnklePitchJoint] = left_joint_vel(0, 0);
         joint_actual_velocity_[LAnkleRollJoint] = left_joint_vel(1, 0);
-        joint_actual_velocity_[RAnklePitchJoint] = left_joint_vel(0, 0);
-        joint_actual_velocity_[RAnkleRollJoint] = left_joint_vel(1, 0);
+        joint_actual_velocity_[RAnklePitchJoint] = right_joint_vel(0, 0);
+        joint_actual_velocity_[RAnkleRollJoint] = right_joint_vel(1, 0);
 
         // Set frontend extra data
         robot_cifx->extra_data_->Set<"l_p_pos">(

@@ -73,19 +73,6 @@ bool HumanoidPolicy::WarmUp(ProprioceptiveObservation<float> const &obs_pack) {
 
   VectorT obs(single_obs_size_);
   obs.setZero();
-  obs.segment(0, 2) =
-      Eigen::Vector2f{std::sin(gait_time_value), std::cos(gait_time_value)};
-  VectorT command_scaled(3);
-  command_scaled.segment(0, 2) =
-      obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
-  command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
-  obs.segment(2, 3) = command_scaled * obs_scale_command_;
-  obs.segment(5, 12) =
-      (obs_pack.joint_pos - joint_default_position_) * obs_scale_dof_pos_;
-  obs.segment(17, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
-  obs.segment(29, 12) = last_action_;
-  obs.segment(41, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
-  obs.segment(44, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(obs);
