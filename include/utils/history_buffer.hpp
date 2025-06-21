@@ -80,9 +80,9 @@ class HistoryBuffer {
           "Index out of range. HistoryBuffer.GetObservation(size_t)");
     }
     VectorT obs(single_obs_size_);
-    obs = MapT<VectorT>(
-        data_ + (current_index_ - index) % buffer_size_ * single_obs_size_,
-        single_obs_size_);
+    obs = MapT<VectorT>(data_ + (current_index_ + buffer_size_ - index) %
+                                    buffer_size_ * single_obs_size_,
+                        single_obs_size_);
     return obs;
   }
 
