@@ -73,6 +73,7 @@ bool HumanoidPolicy::WarmUp(ProprioceptiveObservation<float> const &obs_pack) {
 
   VectorT obs(single_obs_size_);
   obs.setZero();
+  gait_start_ = false;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(obs);

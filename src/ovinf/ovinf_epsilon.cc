@@ -1,24 +1,21 @@
-#include "ovinf/ovinf_humanoid_stand.h"
+#include "ovinf/ovinf_epsilon.h"
 
 namespace ovinf {
 
-HumanoidStandPolicy::~HumanoidStandPolicy() {
+EpsilonPolicy::~EpsilonPolicy() {
   exiting_.store(true);
   if (worker_thread_.joinable()) {
     worker_thread_.join();
   }
 }
 
-HumanoidStandPolicy::HumanoidStandPolicy(const YAML::Node &config)
-    : BasePolicy(config) {
+EpsilonPolicy::EpsilonPolicy(const YAML::Node &config) : BasePolicy(config) {
   // Read config
   size_t joint_counter = 0;
   for (auto const &name : config["policy_joint_names"]) {
     joint_names_[name.as<std::string>()] = joint_counter++;
   }
 
-  cycle_time_ = config["cycle_time"].as<float>();
-  stand_threshold_ = config["stand_threshold"].as<float>();
   single_obs_size_ = config["single_obs_size"].as<size_t>();
   obs_buffer_size_ = config["obs_buffer_size"].as<size_t>();
   action_size_ = config["action_size"].as<size_t>();
@@ -67,16 +64,14 @@ HumanoidStandPolicy::HumanoidStandPolicy(const YAML::Node &config)
 
   inference_done_.store(true);
   exiting_.store(false);
-  worker_thread_ = std::thread(&HumanoidStandPolicy::WorkerThread, this);
+  worker_thread_ = std::thread(&EpsilonPolicy::WorkerThread, this);
 }
 
-bool HumanoidStandPolicy::WarmUp(
-    ProprioceptiveObservation<float> const &obs_pack) {
+bool EpsilonPolicy::WarmUp(ProprioceptiveObservation<float> const &obs_pack) {
   double gait_time_value = 0.0;
 
   VectorT obs(single_obs_size_);
   obs.setZero();
-  gait_start_ = false;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(obs);
@@ -101,40 +96,21 @@ bool HumanoidStandPolicy::WarmUp(
   }
 }
 
-bool HumanoidStandPolicy::InferUnsync(
+bool EpsilonPolicy::InferUnsync(
     ProprioceptiveObservation<float> const &obs_pack) {
-  if (gait_start_ == false && obs_pack.command.norm() > stand_threshold_) {
-    gait_start_ = true;
-    gait_start_time_ = std::chrono::steady_clock::now();
-  } else if (gait_start_ == true &&
-             obs_pack.command.norm() < stand_threshold_) {
-    gait_start_ = false;
-  }
-
-  double gait_time_value = 0.0;
-  if (gait_start_) {
-    double current_gait_time =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                      gait_start_time_)
-            .count();
-    gait_time_value = 2 * M_PI * current_gait_time / cycle_time_;
-  }
-
   VectorT obs(single_obs_size_);
   obs.setZero();
-  obs.segment(0, 2) =
-      Eigen::Vector2f{std::sin(gait_time_value), std::cos(gait_time_value)};
   VectorT command_scaled(3);
   command_scaled.segment(0, 2) =
       obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
   command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
-  obs.segment(2, 3) = command_scaled * obs_scale_command_;
-  obs.segment(5, 12) =
+  obs.segment(0, 3) = command_scaled * obs_scale_command_;
+  obs.segment(3, 12) =
       (obs_pack.joint_pos - joint_default_position_) * obs_scale_dof_pos_;
-  obs.segment(17, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
-  obs.segment(29, 12) = last_action_;
-  obs.segment(41, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
-  obs.segment(44, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
+  obs.segment(15, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
+  obs.segment(27, 12) = last_action_;
+  obs.segment(39, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
+  obs.segment(42, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(obs);
@@ -163,20 +139,20 @@ bool HumanoidStandPolicy::InferUnsync(
   }
 }
 
-std::optional<HumanoidStandPolicy::VectorT> HumanoidStandPolicy::GetResult(
+std::optional<EpsilonPolicy::VectorT> EpsilonPolicy::GetResult(
     const size_t timeout) {
-  if (inference_done_.load()) [[unlikely]] {
+  if (inference_done_.load()) {
     return latest_target_;
   } else {
-    std::this_thread::sleep_for(std::chrono ::microseconds(timeout));
-    if (inference_done_.load()) [[likely]] {
+    std::this_thread::sleep_for(std::chrono::microseconds(timeout));
+    if (inference_done_.load()) {
       return latest_target_;
     }
     return std::nullopt;
   }
 }
 
-void HumanoidStandPolicy::PrintInfo() {
+void EpsilonPolicy::PrintInfo() {
   std::cout << "Load model: " << this->model_path_ << std::endl;
   std::cout << "Device: " << device_ << std::endl;
   std::cout << "Single obs size: " << single_obs_size_ << std::endl;
@@ -199,7 +175,7 @@ void HumanoidStandPolicy::PrintInfo() {
   }
 }
 
-void HumanoidStandPolicy::WorkerThread() {
+void EpsilonPolicy::WorkerThread() {
   if (realtime_) {
     if (!setProcessHighPriority(99)) {
       std::cerr << "Failed to set process high priority." << std::endl;
@@ -233,7 +209,7 @@ void HumanoidStandPolicy::WorkerThread() {
   }
 }
 
-void HumanoidStandPolicy::CreateLog(YAML::Node const &config) {
+void EpsilonPolicy::CreateLog(YAML::Node const &config) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   std::tm *now_tm = std::localtime(&now_time);
@@ -252,13 +228,11 @@ void HumanoidStandPolicy::CreateLog(YAML::Node const &config) {
   }
 
   std::string logger_file = config_file_path.string() + "/" + current_time +
-                            "_humanoid_stand_" + log_name_ + ".csv";
+                            "_humanoid_" + log_name_ + ".csv";
 
   // Get headers
   std::vector<std::string> headers;
 
-  headers.push_back("clock_sin");
-  headers.push_back("clock_cos");
   headers.push_back("command_vel_x");
   headers.push_back("command_vel_y");
   headers.push_back("command_vel_w");
@@ -282,18 +256,8 @@ void HumanoidStandPolicy::CreateLog(YAML::Node const &config) {
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
 
-void HumanoidStandPolicy::WriteLog(
-    ProprioceptiveObservation<float> const &obs_pack) {
+void EpsilonPolicy::WriteLog(ProprioceptiveObservation<float> const &obs_pack) {
   std::vector<CsvLogger::Number> datas;
-
-  double current_gait_time =
-      std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                    gait_start_time_)
-          .count();
-  double gait_time_value = 2 * M_PI * current_gait_time / cycle_time_;
-
-  datas.push_back(std::sin(gait_time_value));
-  datas.push_back(std::cos(gait_time_value));
 
   for (size_t i = 0; i < 3; ++i) {
     datas.push_back(obs_pack.command(i));
