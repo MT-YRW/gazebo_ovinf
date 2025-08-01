@@ -115,6 +115,7 @@ class HumanoidPolicy : public BasePolicy<float> {
   // Clock
   bool gait_start_ = false;
   std::chrono::steady_clock::time_point gait_start_time_;
+  double current_gait_time_ = 0.0;
   std::chrono::high_resolution_clock::time_point infer_start_time_;
   std::chrono::high_resolution_clock::time_point infer_end_time_;
 
@@ -126,6 +127,10 @@ class HumanoidPolicy : public BasePolicy<float> {
 
   // Realtime
   size_t stick_to_core_ = 0;
+
+  // Clock
+  bool use_absolute_clock_ = true;
+  float control_period_ = 0.01f;
 };
 }  // namespace ovinf
 

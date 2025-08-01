@@ -1,27 +1,29 @@
-#ifndef ROBOT_HHFC_MJ_HPP
-#define ROBOT_HHFC_MJ_HPP
+#ifndef ROBOT_HHFC_gz_HPP
+#define ROBOT_HHFC_gz_HPP
 
 #include <filesystem>
 #include <vector>
 
 #include "filter/filter_factory.hpp"
 #include "robot/base/robot_base.hpp"
-#include "robot/fc2_mj/fc2_mj_common.h"
+#include "robot/hhfc_gz/hhfc_gz_common.h"
 #include "utils/csv_logger.hpp"
 
 namespace ovinf {
 
-class RobotFc2Mj : public RobotBase<float> {
+class RobotHhfcGz : public RobotBase<float> {
   using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;
+  friend class ObserverHhfcGz;
+  friend class ExecutorHhfcGz;
 
  public:
-  using Ptr = std::shared_ptr<RobotFc2Mj>;
+  using Ptr = std::shared_ptr<RobotHhfcGz>;
 
  private:
-  class ObserverFc2Mj : public ObserverBase {
+  class ObserverHhfcGz : public ObserverBase {
    public:
-    ObserverFc2Mj() = delete;
-    ObserverFc2Mj(RobotBase<float>* robot, const YAML::Node& config)
+    ObserverHhfcGz() = delete;
+    ObserverHhfcGz(RobotBase<float>* robot, const YAML::Node& config)
         : ObserverBase(robot, config) {
       // Create Filter
       motor_pos_filter_ =
@@ -40,12 +42,12 @@ class RobotFc2Mj : public RobotBase<float> {
     }
 
     virtual bool Update() final {
-      auto robot_mj = dynamic_cast<RobotFc2Mj*>(robot_);
+      auto robot_gz = dynamic_cast<RobotHhfcGz*>(robot_);
 
       for (size_t i = 0; i < motor_size_; ++i) {
-        motor_actual_position_[i] = robot_mj->motors_[i]->GetActualPosition() *
+        motor_actual_position_[i] = robot_gz->motors_[i]->GetActualPosition() *
                                     robot_->motor_direction_(i, 0);
-        motor_actual_velocity_[i] = robot_mj->motors_[i]->GetActualVelocity() *
+        motor_actual_velocity_[i] = robot_gz->motors_[i]->GetActualVelocity() *
                                     robot_->motor_direction_(i, 0);
       }
 
@@ -58,15 +60,19 @@ class RobotFc2Mj : public RobotBase<float> {
       joint_actual_velocity_ = motor_actual_velocity_;
 
       euler_rpy_ = eluer_rpy_filter_->Filter(
-          Eigen::Vector3f(robot_mj->imu_->GetRoll(), robot_mj->imu_->GetPitch(),
-                          robot_mj->imu_->GetYaw()));
+          (VectorT(3) << robot_gz->imu_->GetRoll(), robot_gz->imu_->GetPitch(),
+           robot_gz->imu_->GetYaw())
+              .finished());
 
       acceleration_ = acc_filter_->Filter(
-          Eigen::Vector3f(robot_mj->imu_->GetAccX(), robot_mj->imu_->GetAccY(),
-                          robot_mj->imu_->GetAccZ()));
-      angular_velocity_ = ang_vel_filter_->Filter(Eigen::Vector3f(
-          robot_mj->imu_->GetGyroX(), robot_mj->imu_->GetGyroY(),
-          robot_mj->imu_->GetGyroZ()));
+          (VectorT(3) << robot_gz->imu_->GetAccX(), robot_gz->imu_->GetAccY(),
+           robot_gz->imu_->GetAccZ())
+              .finished());
+
+      angular_velocity_ = ang_vel_filter_->Filter(
+          (VectorT(3) << robot_gz->imu_->GetGyroX(), robot_gz->imu_->GetGyroY(),
+           robot_gz->imu_->GetGyroZ())
+              .finished());
 
       Eigen::Matrix3f Rwb(
           Eigen::AngleAxisf(euler_rpy_[2], Eigen::Vector3f::UnitZ()) *
@@ -96,10 +102,10 @@ class RobotFc2Mj : public RobotBase<float> {
     CsvLogger::Ptr csv_logger_;
   };
 
-  class ExecutorFc2Mj : public ExecutorBase {
+  class ExecutorHhfcGz : public ExecutorBase {
    public:
-    ExecutorFc2Mj() = delete;
-    ExecutorFc2Mj(RobotBase<float>* robot, const YAML::Node& config)
+    ExecutorHhfcGz() = delete;
+    ExecutorHhfcGz(RobotBase<float>* robot, const YAML::Node& config)
         : ExecutorBase(robot, config) {}
 
     virtual bool ExecuteJointTorque() final {
@@ -111,7 +117,7 @@ class RobotFc2Mj : public RobotBase<float> {
     }
 
     virtual bool ExecuteMotorTorque() final {
-      auto robot_mj = dynamic_cast<RobotFc2Mj*>(robot_);
+      auto robot_gz = dynamic_cast<RobotHhfcGz*>(robot_);
       for (size_t i = 0; i < motor_size_; ++i) {
         // Torque limit
         if (motor_target_torque_[i] > torque_limit_[i]) {
@@ -132,9 +138,9 @@ class RobotFc2Mj : public RobotBase<float> {
 
       // Set target
       for (size_t i = 0; i < motor_size_; ++i) {
-        robot_mj->motors_[i]->SetTargetTorque(motor_target_torque_[i] *
+        robot_gz->motors_[i]->SetTargetTorque(motor_target_torque_[i] *
                                               robot_->motor_direction_(i, 0));
-        robot_mj->motors_[i]->SetTargetPosition(motor_target_position_[i] *
+        robot_gz->motors_[i]->SetTargetPosition(motor_target_position_[i] *
                                                 robot_->motor_direction_(i, 0));
       }
       return true;
@@ -150,13 +156,13 @@ class RobotFc2Mj : public RobotBase<float> {
   };
 
  public:
-  RobotFc2Mj() = delete;
-  RobotFc2Mj(const YAML::Node& config) : RobotBase(config) {
+  RobotHhfcGz() = delete;
+  RobotHhfcGz(const YAML::Node& config) : RobotBase(config) {
     motors_.resize(motor_size_);
-    this->observer_ = std::make_shared<ObserverFc2Mj>((RobotBase<float>*)this,
-                                                      config["observer"]);
-    this->executor_ = std::make_shared<ExecutorFc2Mj>((RobotBase<float>*)this,
-                                                      config["executor"]);
+    this->observer_ = std::make_shared<ObserverHhfcGz>((RobotBase<float>*)this,
+                                                       config["observer"]);
+    this->executor_ = std::make_shared<ExecutorHhfcGz>((RobotBase<float>*)this,
+                                                       config["executor"]);
   }
 
   inline void GetDevice(const KernelBus& bus);
@@ -172,11 +178,11 @@ class RobotFc2Mj : public RobotBase<float> {
       std::cout << "  - direction: " << motor_direction_(pair.second, 0)
                 << std::endl;
       std::cout << "  - upper limit: "
-                << Executor()->MotorUpperLimit()(pair.second, 0) << std::endl;
+                << executor_->MotorUpperLimit()(pair.second, 0) << std::endl;
       std::cout << "  - lower limit: "
-                << Executor()->MotorLowerLimit()(pair.second, 0) << std::endl;
+                << executor_->MotorLowerLimit()(pair.second, 0) << std::endl;
       std::cout << "  - torque limit: "
-                << Executor()->TorqueLimit()(pair.second, 0) << std::endl;
+                << executor_->TorqueLimit()(pair.second, 0) << std::endl;
     }
     for (auto const& pair : joint_names_) {
       std::cout << "Joint id: " << pair.second << " name: " << pair.first
@@ -191,35 +197,28 @@ class RobotFc2Mj : public RobotBase<float> {
   // std::vector<AnklePtr> ankles_;
 };
 
-void RobotFc2Mj::GetDevice(const KernelBus& bus) {
-  motors_[LHipYawMotor] = bus.GetDevice<MotorDevice>(0).value();
-  motors_[LHipRollMotor] = bus.GetDevice<MotorDevice>(1).value();
-  motors_[LHipPitchMotor] = bus.GetDevice<MotorDevice>(2).value();
-  motors_[LKneeMotor] = bus.GetDevice<MotorDevice>(3).value();
-  motors_[LAnklePitchMotor] = bus.GetDevice<MotorDevice>(4).value();
-  motors_[LAnkleRollMotor] = bus.GetDevice<MotorDevice>(5).value();
+void RobotHhfcGz::GetDevice(const KernelBus& bus) {
+  motors_[LHipPitchMotor] = bus.GetDevice<MotorDevice>(10).value();
+  motors_[LHipRollMotor] = bus.GetDevice<MotorDevice>(11).value();
+  motors_[LHipYawMotor] = bus.GetDevice<MotorDevice>(12).value();
+  motors_[LKneeMotor] = bus.GetDevice<MotorDevice>(13).value();
+  motors_[LAnklePitchMotor] = bus.GetDevice<MotorDevice>(14).value();
+  motors_[LAnkleRollMotor] = bus.GetDevice<MotorDevice>(15).value();
 
+  motors_[RHipPitchMotor] = bus.GetDevice<MotorDevice>(4).value();
+  motors_[RHipRollMotor] = bus.GetDevice<MotorDevice>(5).value();
   motors_[RHipYawMotor] = bus.GetDevice<MotorDevice>(6).value();
-  motors_[RHipRollMotor] = bus.GetDevice<MotorDevice>(7).value();
-  motors_[RHipPitchMotor] = bus.GetDevice<MotorDevice>(8).value();
-  motors_[RKneeMotor] = bus.GetDevice<MotorDevice>(9).value();
-  motors_[RAnklePitchMotor] = bus.GetDevice<MotorDevice>(10).value();
-  motors_[RAnkleRollMotor] = bus.GetDevice<MotorDevice>(11).value();
+  motors_[RKneeMotor] = bus.GetDevice<MotorDevice>(7).value();
+  motors_[RAnklePitchMotor] = bus.GetDevice<MotorDevice>(8).value();
+  motors_[RAnkleRollMotor] = bus.GetDevice<MotorDevice>(9).value();
 
-  motors_[LShoulderPitchMotor] = bus.GetDevice<MotorDevice>(12).value();
-  motors_[LShoulderRollMotor] = bus.GetDevice<MotorDevice>(13).value();
-  motors_[LShoulderYawMotor] = bus.GetDevice<MotorDevice>(14).value();
-  motors_[LElbowPitchMotor] = bus.GetDevice<MotorDevice>(15).value();
+  motors_[LShoulderPitchMotor] = bus.GetDevice<MotorDevice>(1).value();
+  motors_[RShoulderPitchMotor] = bus.GetDevice<MotorDevice>(0).value();
 
-  motors_[RShoulderPitchMotor] = bus.GetDevice<MotorDevice>(16).value();
-  motors_[RShoulderRollMotor] = bus.GetDevice<MotorDevice>(17).value();
-  motors_[RShoulderYawMotor] = bus.GetDevice<MotorDevice>(18).value();
-  motors_[RElbowPitchMotor] = bus.GetDevice<MotorDevice>(19).value();
-
-  imu_ = bus.GetDevice<ImuDevice>(20).value();
+  imu_ = bus.GetDevice<ImuDevice>(3).value();
 }
 
-void RobotFc2Mj::ObserverFc2Mj::CreateLog(YAML::Node const& config) {
+void RobotHhfcGz::ObserverHhfcGz::CreateLog(YAML::Node const& config) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   std::tm* now_tm = std::localtime(&now_time);
@@ -306,7 +305,7 @@ void RobotFc2Mj::ObserverFc2Mj::CreateLog(YAML::Node const& config) {
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
 
-void RobotFc2Mj::ObserverFc2Mj::WriteLog() {
+void RobotHhfcGz::ObserverHhfcGz::WriteLog() {
   std::vector<CsvLogger::Number> datas;
 
   // Motor actual pos
@@ -374,4 +373,4 @@ void RobotFc2Mj::ObserverFc2Mj::WriteLog() {
 
 }  // namespace ovinf
 
-#endif  // !ROBOT_HHFC_MJ_HPP
+#endif  // !ROBOT_HHFC_gz_HPP

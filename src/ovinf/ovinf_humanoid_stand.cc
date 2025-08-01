@@ -36,6 +36,8 @@ HumanoidStandPolicy::HumanoidStandPolicy(const YAML::Node &config)
   joint_default_position_ = VectorT(joint_names_.size());
   stick_to_core_ = config["stick_to_core"].as<size_t>();
   log_name_ = config["log_name"].as<std::string>();
+  use_absolute_clock_ = config["use_absolute_clock"].as<bool>();
+  control_period_ = config["control_period"].as<float>();
 
   for (auto const &pair : joint_names_) {
     joint_default_position_(pair.second, 0) =
@@ -105,6 +107,7 @@ bool HumanoidStandPolicy::InferUnsync(
     ProprioceptiveObservation<float> const &obs_pack) {
   if (gait_start_ == false && obs_pack.command.norm() > stand_threshold_) {
     gait_start_ = true;
+    current_gait_time_ = 0.0;
     gait_start_time_ = std::chrono::steady_clock::now();
   } else if (gait_start_ == true &&
              obs_pack.command.norm() < stand_threshold_) {
@@ -113,11 +116,16 @@ bool HumanoidStandPolicy::InferUnsync(
 
   double gait_time_value = 0.0;
   if (gait_start_) {
-    double current_gait_time =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                      gait_start_time_)
-            .count();
-    gait_time_value = 2 * M_PI * current_gait_time / cycle_time_;
+    if (use_absolute_clock_) {
+      current_gait_time_ =
+          std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                        gait_start_time_)
+              .count();
+    } else {
+      current_gait_time_ += control_period_;
+    }
+
+    gait_time_value = 2 * M_PI * current_gait_time_ / cycle_time_;
   }
 
   VectorT obs(single_obs_size_);
@@ -286,11 +294,7 @@ void HumanoidStandPolicy::WriteLog(
     ProprioceptiveObservation<float> const &obs_pack) {
   std::vector<CsvLogger::Number> datas;
 
-  double current_gait_time =
-      std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                    gait_start_time_)
-          .count();
-  double gait_time_value = 2 * M_PI * current_gait_time / cycle_time_;
+  double gait_time_value = 2 * M_PI * current_gait_time_ / cycle_time_;
 
   datas.push_back(std::sin(gait_time_value));
   datas.push_back(std::cos(gait_time_value));
