@@ -45,20 +45,19 @@ class HumanoidStandPolicy : public BasePolicy<float> {
   /**
    * @brief Policy warmup
    *
-   * @param[in] obs_pack Proprioceptive observation
+   * @param[in] obs_pack Robot observation
    * @param[in] num_itrations Warmup iterations
    * @return Is warmup done successfully.
    */
-  virtual bool WarmUp(ProprioceptiveObservation<float> const &obs_pack) final;
+  virtual bool WarmUp(RobotObservation<float> const &obs_pack) final;
 
   /**
    * @brief Set observation, run inference.
    *
-   * @param[in] obs_pack Proprioceptive observation
+   * @param[in] obs_pack Robot observation
    * @return Is inference started immidiately.
    */
-  virtual bool InferUnsync(
-      ProprioceptiveObservation<float> const &obs_pack) final;
+  virtual bool InferUnsync(RobotObservation<float> const &obs_pack) final;
 
   /**
    * @brief Get resulting target_joint_pos
@@ -72,7 +71,7 @@ class HumanoidStandPolicy : public BasePolicy<float> {
  private:
   void WorkerThread();
   void CreateLog(YAML::Node const &config);
-  void WriteLog(ProprioceptiveObservation<float> const &obs_pack);
+  void WriteLog(RobotObservation<float> const &obs_pack);
 
  private:
   // Threading

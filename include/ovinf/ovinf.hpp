@@ -10,7 +10,7 @@
 namespace ovinf {
 
 template <typename T = float>
-struct ProprioceptiveObservation {
+struct RobotObservation {
   Eigen::Matrix<T, Eigen::Dynamic, 1> clock = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> command = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> ang_vel = {};
@@ -21,6 +21,7 @@ struct ProprioceptiveObservation {
   Eigen::Matrix<T, Eigen::Dynamic, 1> position = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> velocity = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> euler_angles = {};
+  Eigen::Matrix<T, Eigen::Dynamic, 1> scan = {};
   Eigen::Matrix<T, Eigen::Dynamic, 1> custom = {};
 };
 
@@ -42,20 +43,20 @@ class BasePolicy {
   /**
    * @brief Policy warmup
    *
-   * @param[in] obs_pack Proprioceptive observation
+   * @param[in] obs_pack Robot observation
    * @param[in] num_itrations Warmup iterations
    * @return Is warmup done successfully.
    */
-  virtual bool WarmUp(const ProprioceptiveObservation<T> &obs) = 0;
+  virtual bool WarmUp(const RobotObservation<T> &obs) = 0;
 
   /**
    * @brief Set observation, run inference.
    *
-   * @param[in] obs_pack Proprioceptive observation
+   * @param[in] obs_pack Robot observation
    * @return Is inference started immidiately.
    */
   [[nodiscard("Return value of InferUnsync should be checked.")]] virtual bool
-  InferUnsync(const ProprioceptiveObservation<T> &obs) = 0;
+  InferUnsync(const RobotObservation<T> &obs) = 0;
 
   /**
    * @brief Get resulting target_joint_pos

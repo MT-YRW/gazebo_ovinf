@@ -27,6 +27,12 @@ class PolicyController : public ControllerBase<float> {
       d_gains_(pair.second) = config["d_gains"][pair.first].as<float>();
     }
 
+    if (config["perception_enabled"].IsNull()) {
+      perception_enabled_ = false;
+    } else {
+      perception_enabled_ = config["perception_enabled"].as<bool>();
+    }
+
     command_ = VectorT::Zero(3);
     counter_ = 0;
 
@@ -35,14 +41,26 @@ class PolicyController : public ControllerBase<float> {
 
   virtual void WarmUp() final {
     if (counter_++ % decimation_ == 0) {
-      inference_net_->WarmUp(
-          {.command = command_,
-           .ang_vel = robot_->Observer()->AngularVelocity(),
-           .proj_gravity = robot_->Observer()->ProjGravity(),
-           .joint_pos =
-               robot_->Observer()->JointActualPosition().segment(0, 12),
-           .joint_vel =
-               robot_->Observer()->JointActualVelocity().segment(0, 12)});
+      if (perception_enabled_) {
+        inference_net_->WarmUp(
+            {.command = command_,
+             .ang_vel = robot_->Observer()->AngularVelocity(),
+             .proj_gravity = robot_->Observer()->ProjGravity(),
+             .joint_pos =
+                 robot_->Observer()->JointActualPosition().segment(0, 12),
+             .joint_vel =
+                 robot_->Observer()->JointActualVelocity().segment(0, 12),
+             .scan = robot_->Observer()->Scan()});
+      } else {
+        inference_net_->WarmUp(
+            {.command = command_,
+             .ang_vel = robot_->Observer()->AngularVelocity(),
+             .proj_gravity = robot_->Observer()->ProjGravity(),
+             .joint_pos =
+                 robot_->Observer()->JointActualPosition().segment(0, 12),
+             .joint_vel =
+                 robot_->Observer()->JointActualVelocity().segment(0, 12)});
+      }
     }
     // inference_net_->PrintInfo();
   }
@@ -60,14 +78,26 @@ class PolicyController : public ControllerBase<float> {
     }
 
     if (counter_++ % decimation_ == 0) {
-      auto err = inference_net_->InferUnsync(
-          {.command = command_,
-           .ang_vel = robot_->Observer()->AngularVelocity(),
-           .proj_gravity = robot_->Observer()->ProjGravity(),
-           .joint_pos =
-               robot_->Observer()->JointActualPosition().segment(0, 12),
-           .joint_vel =
-               robot_->Observer()->JointActualVelocity().segment(0, 12)});
+      if (perception_enabled_) {
+        auto err = inference_net_->InferUnsync(
+            {.command = command_,
+             .ang_vel = robot_->Observer()->AngularVelocity(),
+             .proj_gravity = robot_->Observer()->ProjGravity(),
+             .joint_pos =
+                 robot_->Observer()->JointActualPosition().segment(0, 12),
+             .joint_vel =
+                 robot_->Observer()->JointActualVelocity().segment(0, 12),
+             .scan = robot_->Observer()->Scan()});
+      } else {
+        auto err = inference_net_->InferUnsync(
+            {.command = command_,
+             .ang_vel = robot_->Observer()->AngularVelocity(),
+             .proj_gravity = robot_->Observer()->ProjGravity(),
+             .joint_pos =
+                 robot_->Observer()->JointActualPosition().segment(0, 12),
+             .joint_vel =
+                 robot_->Observer()->JointActualVelocity().segment(0, 12)});
+      }
     }
 
     if (set_target) {
@@ -95,6 +125,7 @@ class PolicyController : public ControllerBase<float> {
 
  private:
   const int decimation_;
+  bool perception_enabled_ = false;
 
   VectorT command_;
   size_t counter_ = 0;

@@ -4,7 +4,6 @@
 #include "bitbot_gz/device/gz_imu.h"
 #include "bitbot_gz/device/gz_joint.h"
 #include "bitbot_gz/kernel/gz_kernel.hpp"
-#include "utils/parallel_ankle.hpp"
 
 namespace ovinf {
 
@@ -57,7 +56,6 @@ using ImuDevice = bitbot::GzImu;
 using ImuPtr = ImuDevice*;
 using MotorDevice = bitbot::GzJoint;
 using MotorPtr = MotorDevice*;
-using AnklePtr = std::shared_ptr<ovinf::ParallelAnkle<float>>;
 
 struct UserData {};
 

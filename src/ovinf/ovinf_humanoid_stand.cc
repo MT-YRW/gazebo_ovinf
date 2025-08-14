@@ -72,8 +72,7 @@ HumanoidStandPolicy::HumanoidStandPolicy(const YAML::Node &config)
   worker_thread_ = std::thread(&HumanoidStandPolicy::WorkerThread, this);
 }
 
-bool HumanoidStandPolicy::WarmUp(
-    ProprioceptiveObservation<float> const &obs_pack) {
+bool HumanoidStandPolicy::WarmUp(RobotObservation<float> const &obs_pack) {
   double gait_time_value = 0.0;
 
   VectorT obs(single_obs_size_);
@@ -103,8 +102,7 @@ bool HumanoidStandPolicy::WarmUp(
   }
 }
 
-bool HumanoidStandPolicy::InferUnsync(
-    ProprioceptiveObservation<float> const &obs_pack) {
+bool HumanoidStandPolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
   if (gait_start_ == false && obs_pack.command.norm() > stand_threshold_) {
     gait_start_ = true;
     current_gait_time_ = 0.0;
@@ -290,8 +288,7 @@ void HumanoidStandPolicy::CreateLog(YAML::Node const &config) {
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
 
-void HumanoidStandPolicy::WriteLog(
-    ProprioceptiveObservation<float> const &obs_pack) {
+void HumanoidStandPolicy::WriteLog(RobotObservation<float> const &obs_pack) {
   std::vector<CsvLogger::Number> datas;
 
   double gait_time_value = 2 * M_PI * current_gait_time_ / cycle_time_;

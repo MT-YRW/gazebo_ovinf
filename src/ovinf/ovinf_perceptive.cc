@@ -1,22 +1,25 @@
-#include "ovinf/ovinf_epsilon.h"
+#include "ovinf/ovinf_perceptive.h"
 
 namespace ovinf {
 
-EpsilonPolicy::~EpsilonPolicy() {
+PerceptivePolicy::~PerceptivePolicy() {
   exiting_.store(true);
   if (worker_thread_.joinable()) {
     worker_thread_.join();
   }
 }
 
-EpsilonPolicy::EpsilonPolicy(const YAML::Node &config) : BasePolicy(config) {
+PerceptivePolicy::PerceptivePolicy(const YAML::Node &config)
+    : BasePolicy(config) {
   // Read config
   size_t joint_counter = 0;
   for (auto const &name : config["policy_joint_names"]) {
     joint_names_[name.as<std::string>()] = joint_counter++;
   }
 
+  cycle_time_ = config["cycle_time"].as<float>();
   single_obs_size_ = config["single_obs_size"].as<size_t>();
+  scan_size_ = config["scan_size"].as<size_t>();
   obs_buffer_size_ = config["obs_buffer_size"].as<size_t>();
   action_size_ = config["action_size"].as<size_t>();
   if (action_size_ != joint_counter) {
@@ -29,10 +32,13 @@ EpsilonPolicy::EpsilonPolicy(const YAML::Node &config) : BasePolicy(config) {
   obs_scale_dof_pos_ = config["obs_scales"]["dof_pos"].as<float>();
   obs_scale_dof_vel_ = config["obs_scales"]["dof_vel"].as<float>();
   obs_scale_proj_gravity_ = config["obs_scales"]["proj_gravity"].as<float>();
+  obs_scale_scan_ = config["obs_scales"]["scan"].as<float>();
   clip_action_ = config["clip_action"].as<float>();
   joint_default_position_ = VectorT(joint_names_.size());
   stick_to_core_ = config["stick_to_core"].as<size_t>();
   log_name_ = config["log_name"].as<std::string>();
+  use_absolute_clock_ = config["use_absolute_clock"].as<bool>();
+  control_period_ = config["control_period"].as<float>();
 
   for (auto const &pair : joint_names_) {
     joint_default_position_(pair.second, 0) =
@@ -64,17 +70,15 @@ EpsilonPolicy::EpsilonPolicy(const YAML::Node &config) : BasePolicy(config) {
 
   inference_done_.store(true);
   exiting_.store(false);
-  worker_thread_ = std::thread(&EpsilonPolicy::WorkerThread, this);
+  worker_thread_ = std::thread(&PerceptivePolicy::WorkerThread, this);
 }
 
-bool EpsilonPolicy::WarmUp(RobotObservation<float> const &obs_pack) {
-  double gait_time_value = 0.0;
-
-  VectorT obs(single_obs_size_);
-  obs.setZero();
+bool PerceptivePolicy::WarmUp(RobotObservation<float> const &obs_pack) {
+  VectorT prop_obs(single_obs_size_);
+  prop_obs.setZero();
 
   if (!inference_done_.load()) {
-    input_queue_.enqueue(obs);
+    input_queue_.enqueue(prop_obs);
     return false;
   } else {
     while (input_queue_.peek() != nullptr) {
@@ -82,11 +86,16 @@ bool EpsilonPolicy::WarmUp(RobotObservation<float> const &obs_pack) {
       input_queue_.try_dequeue(old_obs);
       obs_buffer_->AddObservation(old_obs);
     }
-    obs_buffer_->AddObservation(obs);
+    obs_buffer_->AddObservation(prop_obs);
+    auto &history_obs = obs_buffer_->GetObsHistory();
+    VectorT actor_obs(single_obs_size_ * obs_buffer_size_ + scan_size_);
+
+    std::copy(history_obs.begin(), history_obs.end(), actor_obs.data());
+    std::copy(obs_pack.scan.begin(), obs_pack.scan.end(),
+              actor_obs.data() + single_obs_size_ * obs_buffer_size_);
 
     ov::Tensor input_tensor(input_info_.get_element_type(),
-                            input_info_.get_shape(),
-                            obs_buffer_->GetObsHistory().data());
+                            input_info_.get_shape(), actor_obs.data());
     infer_start_time_ = std::chrono::high_resolution_clock::now();
 
     infer_request_.set_input_tensor(input_tensor);
@@ -96,23 +105,23 @@ bool EpsilonPolicy::WarmUp(RobotObservation<float> const &obs_pack) {
   }
 }
 
-bool EpsilonPolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
-  VectorT obs(single_obs_size_);
-  obs.setZero();
+bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
+  VectorT prop_obs(single_obs_size_);
+  prop_obs.setZero();
   VectorT command_scaled(3);
   command_scaled.segment(0, 2) =
       obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
   command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
-  obs.segment(0, 3) = command_scaled * obs_scale_command_;
-  obs.segment(3, 12) =
+  prop_obs.segment(0, 3) = command_scaled * obs_scale_command_;
+  prop_obs.segment(3, 12) =
       (obs_pack.joint_pos - joint_default_position_) * obs_scale_dof_pos_;
-  obs.segment(15, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
-  obs.segment(27, 12) = last_action_;
-  obs.segment(39, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
-  obs.segment(42, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
+  prop_obs.segment(15, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
+  prop_obs.segment(27, 12) = last_action_;
+  prop_obs.segment(39, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
+  prop_obs.segment(42, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
 
   if (!inference_done_.load()) {
-    input_queue_.enqueue(obs);
+    input_queue_.enqueue(prop_obs);
     return false;
   } else {
     while (input_queue_.peek() != nullptr) {
@@ -120,11 +129,16 @@ bool EpsilonPolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
       input_queue_.try_dequeue(old_obs);
       obs_buffer_->AddObservation(old_obs);
     }
-    obs_buffer_->AddObservation(obs);
+    obs_buffer_->AddObservation(prop_obs);
+    auto &history_obs = obs_buffer_->GetObsHistory();
+    VectorT actor_obs(single_obs_size_ * obs_buffer_size_ + scan_size_);
+
+    std::copy(history_obs.begin(), history_obs.end(), actor_obs.data());
+    std::copy(obs_pack.scan.begin(), obs_pack.scan.end(),
+              actor_obs.data() + single_obs_size_ * obs_buffer_size_);
 
     ov::Tensor input_tensor(input_info_.get_element_type(),
-                            input_info_.get_shape(),
-                            obs_buffer_->GetObsHistory().data());
+                            input_info_.get_shape(), actor_obs.data());
     infer_start_time_ = std::chrono::high_resolution_clock::now();
 
     infer_request_.set_input_tensor(input_tensor);
@@ -138,7 +152,7 @@ bool EpsilonPolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
   }
 }
 
-std::optional<EpsilonPolicy::VectorT> EpsilonPolicy::GetResult(
+std::optional<PerceptivePolicy::VectorT> PerceptivePolicy::GetResult(
     const size_t timeout) {
   if (inference_done_.load()) {
     return latest_target_;
@@ -151,7 +165,7 @@ std::optional<EpsilonPolicy::VectorT> EpsilonPolicy::GetResult(
   }
 }
 
-void EpsilonPolicy::PrintInfo() {
+void PerceptivePolicy::PrintInfo() {
   std::cout << "Load model: " << this->model_path_ << std::endl;
   std::cout << "Device: " << device_ << std::endl;
   std::cout << "Single obs size: " << single_obs_size_ << std::endl;
@@ -174,7 +188,7 @@ void EpsilonPolicy::PrintInfo() {
   }
 }
 
-void EpsilonPolicy::WorkerThread() {
+void PerceptivePolicy::WorkerThread() {
   if (realtime_) {
     if (!setProcessHighPriority(99)) {
       std::cerr << "Failed to set process high priority." << std::endl;
@@ -208,7 +222,7 @@ void EpsilonPolicy::WorkerThread() {
   }
 }
 
-void EpsilonPolicy::CreateLog(YAML::Node const &config) {
+void PerceptivePolicy::CreateLog(YAML::Node const &config) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   std::tm *now_tm = std::localtime(&now_time);
@@ -227,11 +241,13 @@ void EpsilonPolicy::CreateLog(YAML::Node const &config) {
   }
 
   std::string logger_file = config_file_path.string() + "/" + current_time +
-                            "_humanoid_" + log_name_ + ".csv";
+                            "_perceptive_" + log_name_ + ".csv";
 
   // Get headers
   std::vector<std::string> headers;
 
+  headers.push_back("clock_sin");
+  headers.push_back("clock_cos");
   headers.push_back("command_vel_x");
   headers.push_back("command_vel_y");
   headers.push_back("command_vel_w");
@@ -255,7 +271,7 @@ void EpsilonPolicy::CreateLog(YAML::Node const &config) {
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
 
-void EpsilonPolicy::WriteLog(RobotObservation<float> const &obs_pack) {
+void PerceptivePolicy::WriteLog(RobotObservation<float> const &obs_pack) {
   std::vector<CsvLogger::Number> datas;
 
   for (size_t i = 0; i < 3; ++i) {

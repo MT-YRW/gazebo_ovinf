@@ -54,6 +54,8 @@ class RobotBase {
     const VectorT& EulerRpy() { return euler_rpy_; }
     const VectorT& ProjGravity() { return proj_gravity_; }
 
+    const VectorT& Scan() { return scan_; }
+
    protected:
     size_t motor_size_ = 0;
     size_t joint_size_ = 0;
@@ -69,6 +71,8 @@ class RobotBase {
     VectorT acceleration_;
     VectorT euler_rpy_;
     VectorT proj_gravity_;
+
+    VectorT scan_;
   };
 
   class ExecutorBase {

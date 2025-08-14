@@ -1,12 +1,5 @@
-/**
- * @file ovinf_epsilon.h
- * @brief Clock-free
- * @author Dknt
- * @date 2025-7
- */
-
-#ifndef OVINF_EPSILON_H
-#define OVINF_EPSILON_H
+#ifndef OVINF_PERCEPTIVE_H
+#define OVINF_PERCEPTIVE_H
 
 #include <yaml-cpp/yaml.h>
 
@@ -30,43 +23,22 @@
 
 namespace ovinf {
 
-/**
- * @brief clock-free inference.
- */
-class EpsilonPolicy : public BasePolicy<float> {
+class PerceptivePolicy : public BasePolicy<float> {
   using MatrixT = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>;
   using VectorT = Eigen::Matrix<float, Eigen::Dynamic, 1>;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
  public:
-  EpsilonPolicy() = delete;
-  ~EpsilonPolicy();
+  PerceptivePolicy() = delete;
+  ~PerceptivePolicy();
 
-  EpsilonPolicy(const YAML::Node &config);
+  PerceptivePolicy(const YAML::Node &config);
 
-  /**
-   * @brief Policy warmup
-   *
-   * @param[in] obs_pack Robot observation
-   * @param[in] num_itrations Warmup iterations
-   * @return Is warmup done successfully.
-   */
   virtual bool WarmUp(RobotObservation<float> const &obs_pack) final;
 
-  /**
-   * @brief Set observation, run inference.
-   *
-   * @param[in] obs_pack Robot observation
-   * @return Is inference started immidiately.
-   */
   virtual bool InferUnsync(RobotObservation<float> const &obs_pack) final;
 
-  /**
-   * @brief Get resulting target_joint_pos
-   *
-   * @param[in] timeout Timeout in microseconds
-   */
   virtual std::optional<VectorT> GetResult(const size_t timeout = 300) final;
 
   virtual void PrintInfo() final;
@@ -89,9 +61,11 @@ class EpsilonPolicy : public BasePolicy<float> {
 
   // Infer data
   std::map<std::string, size_t> joint_names_;
+  float cycle_time_;
   VectorT joint_default_position_;
 
   size_t single_obs_size_;
+  size_t scan_size_;
   size_t obs_buffer_size_;
   size_t action_size_;
 
@@ -102,6 +76,7 @@ class EpsilonPolicy : public BasePolicy<float> {
   float obs_scale_dof_pos_;
   float obs_scale_dof_vel_;
   float obs_scale_proj_gravity_;
+  float obs_scale_scan_;
   float clip_action_;
 
   // Buffer
@@ -122,7 +97,12 @@ class EpsilonPolicy : public BasePolicy<float> {
 
   // Realtime
   size_t stick_to_core_ = 0;
+
+  // Clock
+  bool use_absolute_clock_ = true;
+  float control_period_ = 0.01f;
 };
+
 }  // namespace ovinf
 
-#endif  // !OVINF_EPSILON_H
+#endif  // !OVINF_PERCEPTIVE_H
