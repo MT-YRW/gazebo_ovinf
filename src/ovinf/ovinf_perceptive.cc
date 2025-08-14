@@ -37,8 +37,6 @@ PerceptivePolicy::PerceptivePolicy(const YAML::Node &config)
   joint_default_position_ = VectorT(joint_names_.size());
   stick_to_core_ = config["stick_to_core"].as<size_t>();
   log_name_ = config["log_name"].as<std::string>();
-  use_absolute_clock_ = config["use_absolute_clock"].as<bool>();
-  control_period_ = config["control_period"].as<float>();
 
   for (auto const &pair : joint_names_) {
     joint_default_position_(pair.second, 0) =

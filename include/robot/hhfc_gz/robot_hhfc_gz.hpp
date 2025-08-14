@@ -1,7 +1,17 @@
 #ifndef ROBOT_HHFC_gz_HPP
 #define ROBOT_HHFC_gz_HPP
 
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <filesystem>
+#include <grid_map_msgs/msg/grid_map.hpp>
+#include <grid_map_ros/grid_map_ros.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <vector>
 
 #include "filter/filter_factory.hpp"
@@ -21,6 +31,207 @@ class RobotHhfcGz : public RobotBase<float> {
 
  private:
   class ObserverHhfcGz : public ObserverBase {
+    class ScanInterface : public rclcpp::Node {
+     public:
+      using Ptr = std::shared_ptr<ScanInterface>;
+      ScanInterface(YAML::Node const& config)
+          : rclcpp::Node("bitbot_scan_interface") {
+        scan_x_num_ = config["scan_x_num"].as<size_t>();
+        scan_y_num_ = config["scan_y_num"].as<size_t>();
+        scan_x_res_ = config["scan_x_res"].as<float>();
+        scan_y_res_ = config["scan_y_res"].as<float>();
+        scan_x_bias_ = config["scan_x_bias"].as<float>();
+        scan_y_bias_ = config["scan_y_bias"].as<float>();
+
+        height_points_ =
+            Eigen::MatrixX<Eigen::Vector3f>(scan_x_num_, scan_y_num_);
+        for (size_t i = 0; i < scan_x_num_; ++i) {
+          for (size_t j = 0; j < scan_y_num_; ++j) {
+            height_points_(i, j) =
+                Eigen::Vector3f(i * scan_x_res_ + scan_x_bias_,
+                                j * scan_y_res_ + scan_y_bias_, 0.0f);
+          }
+        }
+
+        // ROS utilities.
+        pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+            "scan_points", 10);
+
+        grid_map_sub_ = this->create_subscription<grid_map_msgs::msg::GridMap>(
+            "elevation_map", 10,
+            std::bind(&ScanInterface::GridMapCallback, this,
+                      std::placeholders::_1));
+
+        tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ =
+            std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(100),
+            std::bind(&ScanInterface::TimerCallback, this));
+      }
+
+      ~ScanInterface() {
+        if (ros_loop_ && ros_loop_->joinable()) {
+          ros_loop_->join();
+        }
+      }
+
+      static void RunRosSpin(Ptr ptr) {
+        RCLCPP_INFO(rclcpp::get_logger("bitbot_ros_interface"),
+                    "Starting ROS spin loop...");
+        ptr->ros_loop_ =
+            std::make_shared<std::thread>([ptr]() { rclcpp::spin(ptr); });
+      }
+
+     private:
+      void GridMapCallback(const grid_map_msgs::msg::GridMap::SharedPtr msg) {
+        grid_map::GridMapRosConverter::fromMessage(*msg, grid_map_);
+        Twm_ = Eigen::Isometry3f(
+            Eigen::Translation3f(msg->info.pose.position.x,
+                                 msg->info.pose.position.y,
+                                 msg->info.pose.position.z) *
+            Eigen::Quaternionf(
+                msg->info.pose.orientation.w, msg->info.pose.orientation.x,
+                msg->info.pose.orientation.y, msg->info.pose.orientation.z));
+      }
+
+      void TimerCallback() {
+        if (grid_map_.getLayers().empty()) {
+          return;
+        }
+
+        geometry_msgs::msg::TransformStamped transform;
+        try {
+          transform = tf_buffer_->lookupTransform("world", "base_thorax",
+                                                  tf2::TimePointZero);
+        } catch (tf2::TransformException& ex) {
+          RCLCPP_WARN(this->get_logger(), "Could not get transform: %s",
+                      ex.what());
+          return;
+        }
+
+        Eigen::Isometry3f Twb = Eigen::Isometry3f(
+            Eigen::Translation3f(transform.transform.translation.x,
+                                 transform.transform.translation.y,
+                                 transform.transform.translation.z) *
+            Eigen::Quaternionf(transform.transform.rotation.w,
+                               transform.transform.rotation.x,
+                               transform.transform.rotation.y,
+                               transform.transform.rotation.z));
+        Eigen::Isometry3f Twb_yaw(
+            Eigen::Translation3f(transform.transform.translation.x,
+                                 transform.transform.translation.y,
+                                 transform.transform.translation.z) *
+            Eigen::Quaternionf(transform.transform.rotation.w, 0.0f, 0.0f,
+                               transform.transform.rotation.z));
+        Eigen::Isometry3f Tmb_yaw = Twm_.inverse() * Twb_yaw;
+
+        Eigen::MatrixXf height_measurement(height_points_.rows(),
+                                           height_points_.cols());
+
+        float resolution = grid_map_.getResolution();
+        float length_x = grid_map_.getLength().x();
+        float length_y = grid_map_.getLength().y();
+
+        Eigen::MatrixX<float> elevation_matrix(grid_map_.getSize()(0),
+                                               grid_map_.getSize()(1));
+
+        for (grid_map::GridMapIterator it(grid_map_); !it.isPastEnd(); ++it) {
+          grid_map::Position position;
+          grid_map_.getPosition(*it, position);
+          auto index = it.getUnwrappedIndex();
+          float elevation = grid_map_.at("elevation", *it);
+          if (std::isnan(elevation)) {
+            elevation = -1.0;  // Use -1.0 for NaN values
+          }
+          elevation_matrix(index(0), index(1)) = elevation;
+        }
+
+        for (size_t i = 0; i < height_points_.rows(); ++i) {
+          for (size_t j = 0; j < height_points_.cols(); ++j) {
+            Eigen::Vector3f point_b = height_points_(i, j);
+            auto point_m = Tmb_yaw * point_b;
+            int x_index =
+                std::floor((-point_m.x() + length_x / 2.0f) / resolution);
+            int y_index =
+                std::floor((-point_m.y() + length_y / 2.0f) / resolution);
+            x_index = std::max(
+                0, std::min(x_index,
+                            static_cast<int>(elevation_matrix.rows()) - 2));
+            y_index = std::max(
+                0, std::min(y_index,
+                            static_cast<int>(elevation_matrix.cols()) - 2));
+
+            float elevation_1 = elevation_matrix(x_index, y_index);
+            float elevation_2 = elevation_matrix(x_index + 1, y_index);
+            float elevation_3 = elevation_matrix(x_index, y_index + 1);
+            float elevation =
+                std::min(std::min(elevation_1, elevation_2), elevation_3);
+            height_measurement(i, j) = Twb.translation().z() - 0.5 - elevation;
+          }
+        }
+
+        // Test
+        pointcloud_msg_.header.stamp = transform.header.stamp;
+        pointcloud_msg_.header.frame_id = "world";
+        pointcloud_msg_.height = 1;
+        pointcloud_msg_.width =
+            height_measurement.cols() * height_measurement.rows();
+        pointcloud_msg_.is_dense = false;
+        pointcloud_msg_.is_bigendian = false;
+        sensor_msgs::PointCloud2Modifier modifier(pointcloud_msg_);
+        modifier.setPointCloud2FieldsByString(1, "xyz");
+
+        sensor_msgs::PointCloud2Iterator<float> iter_x(pointcloud_msg_, "x");
+        sensor_msgs::PointCloud2Iterator<float> iter_y(pointcloud_msg_, "y");
+        sensor_msgs::PointCloud2Iterator<float> iter_z(pointcloud_msg_, "z");
+
+        for (size_t i = 0; i < height_measurement.size(); ++i) {
+          float x = scan_x_res_ * (i % scan_x_num_) + scan_x_bias_;
+          float y =
+              scan_y_res_ * static_cast<int>(i / scan_x_num_) + scan_y_bias_;
+          float elevation = -0.5 - height_measurement.data()[i];
+          Eigen::Vector3f point(x, y, elevation);
+          point = Twm_ * Tmb_yaw * point;
+          // point = Twm_ * point;
+
+          *iter_x = point.x();
+          *iter_y = point.y();
+          *iter_z = point.z();
+
+          ++iter_x;
+          ++iter_y;
+          ++iter_z;
+        }
+
+        pointcloud_pub_->publish(pointcloud_msg_);
+      }
+
+     private:
+      size_t scan_x_num_;
+      size_t scan_y_num_;
+      float scan_x_res_;
+      float scan_y_res_;
+      float scan_x_bias_;
+      float scan_y_bias_;
+
+      std::shared_ptr<std::thread> ros_loop_;
+      rclcpp::Subscription<grid_map_msgs::msg::GridMap>::SharedPtr
+          grid_map_sub_;
+      rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
+          pointcloud_pub_;
+      rclcpp::TimerBase::SharedPtr timer_;
+      std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+      std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+      sensor_msgs::msg::PointCloud2 pointcloud_msg_;
+
+      std::mutex height_mutex_;
+      Eigen::Isometry3f Twm_;
+      Eigen::MatrixX<Eigen::Vector3f> height_points_;
+
+      grid_map::GridMap grid_map_;
+    };
+
    public:
     ObserverHhfcGz() = delete;
     ObserverHhfcGz(RobotBase<float>* robot, const YAML::Node& config)
@@ -33,6 +244,11 @@ class RobotHhfcGz : public RobotBase<float> {
       ang_vel_filter_ = FilterFactory::CreateFilter(config["ang_vel_filter"]);
       acc_filter_ = FilterFactory::CreateFilter(config["acc_filter"]);
       eluer_rpy_filter_ = FilterFactory::CreateFilter(config["euler_filter"]);
+
+      scan_size_ = config["scan_size"].as<size_t>();
+      scan_.resize(scan_size_);
+      scan_interface_ = std::make_shared<ScanInterface>(config);
+      ScanInterface::RunRosSpin(scan_interface_);
 
       // Create Logger
       log_flag_ = config["log_data"].as<bool>();
@@ -97,6 +313,9 @@ class RobotHhfcGz : public RobotBase<float> {
     FilterBase<VectorT>::Ptr ang_vel_filter_;
     FilterBase<VectorT>::Ptr acc_filter_;
     FilterBase<VectorT>::Ptr eluer_rpy_filter_;
+
+    size_t scan_size_ = 0;
+    ScanInterface::Ptr scan_interface_;
 
     bool log_flag_ = false;
     CsvLogger::Ptr csv_logger_;

@@ -97,10 +97,6 @@ class PerceptivePolicy : public BasePolicy<float> {
 
   // Realtime
   size_t stick_to_core_ = 0;
-
-  // Clock
-  bool use_absolute_clock_ = true;
-  float control_period_ = 0.01f;
 };
 
 }  // namespace ovinf

@@ -27,7 +27,7 @@ class PolicyController : public ControllerBase<float> {
       d_gains_(pair.second) = config["d_gains"][pair.first].as<float>();
     }
 
-    if (config["perception_enabled"].IsNull()) {
+    if (!config["perception_enabled"]) {
       perception_enabled_ = false;
     } else {
       perception_enabled_ = config["perception_enabled"].as<bool>();
