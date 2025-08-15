@@ -84,6 +84,7 @@ class PerceptivePolicy : public BasePolicy<float> {
   std::shared_ptr<HistoryBuffer<float>> obs_buffer_;
   VectorT last_action_;
   VectorT latest_target_;
+  VectorT actor_obs_;
 
   // Clock
   std::chrono::high_resolution_clock::time_point infer_start_time_;

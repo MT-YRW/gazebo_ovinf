@@ -9,9 +9,11 @@
 #include <filesystem>
 #include <grid_map_msgs/msg/grid_map.hpp>
 #include <grid_map_ros/grid_map_ros.hpp>
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <thread>
 #include <vector>
 
 #include "filter/filter_factory.hpp"
@@ -52,6 +54,9 @@ class RobotHhfcGz : public RobotBase<float> {
                                 j * scan_y_res_ + scan_y_bias_, 0.0f);
           }
         }
+        height_measurement_ = Eigen::Matrix<float, Eigen::Dynamic,
+                                            Eigen::Dynamic, Eigen::RowMajor>(
+            height_points_.rows(), height_points_.cols());
 
         // ROS utilities.
         pointcloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
@@ -81,6 +86,11 @@ class RobotHhfcGz : public RobotBase<float> {
                     "Starting ROS spin loop...");
         ptr->ros_loop_ =
             std::make_shared<std::thread>([ptr]() { rclcpp::spin(ptr); });
+      }
+
+      auto const& GetHeightMeasurement() {
+        std::lock_guard<std::mutex> lock(height_mutex_);
+        return height_measurement_;
       }
 
      private:
@@ -126,9 +136,6 @@ class RobotHhfcGz : public RobotBase<float> {
                                transform.transform.rotation.z));
         Eigen::Isometry3f Tmb_yaw = Twm_.inverse() * Twb_yaw;
 
-        Eigen::MatrixXf height_measurement(height_points_.rows(),
-                                           height_points_.cols());
-
         float resolution = grid_map_.getResolution();
         float length_x = grid_map_.getLength().x();
         float length_y = grid_map_.getLength().y();
@@ -147,28 +154,34 @@ class RobotHhfcGz : public RobotBase<float> {
           elevation_matrix(index(0), index(1)) = elevation;
         }
 
-        for (size_t i = 0; i < height_points_.rows(); ++i) {
-          for (size_t j = 0; j < height_points_.cols(); ++j) {
-            Eigen::Vector3f point_b = height_points_(i, j);
-            auto point_m = Tmb_yaw * point_b;
-            int x_index =
-                std::floor((-point_m.x() + length_x / 2.0f) / resolution);
-            int y_index =
-                std::floor((-point_m.y() + length_y / 2.0f) / resolution);
-            x_index = std::max(
-                0, std::min(x_index,
-                            static_cast<int>(elevation_matrix.rows()) - 2));
-            y_index = std::max(
-                0, std::min(y_index,
-                            static_cast<int>(elevation_matrix.cols()) - 2));
+        auto height_measurement_local = height_measurement_;
+        {
+          std::lock_guard<std::mutex> lock(height_mutex_);
+          for (size_t i = 0; i < height_points_.rows(); ++i) {
+            for (size_t j = 0; j < height_points_.cols(); ++j) {
+              Eigen::Vector3f point_b = height_points_(i, j);
+              auto point_m = Tmb_yaw * point_b;
+              int x_index =
+                  std::floor((-point_m.x() + length_x / 2.0f) / resolution);
+              int y_index =
+                  std::floor((-point_m.y() + length_y / 2.0f) / resolution);
+              x_index = std::max(
+                  0, std::min(x_index,
+                              static_cast<int>(elevation_matrix.rows()) - 2));
+              y_index = std::max(
+                  0, std::min(y_index,
+                              static_cast<int>(elevation_matrix.cols()) - 2));
 
-            float elevation_1 = elevation_matrix(x_index, y_index);
-            float elevation_2 = elevation_matrix(x_index + 1, y_index);
-            float elevation_3 = elevation_matrix(x_index, y_index + 1);
-            float elevation =
-                std::min(std::min(elevation_1, elevation_2), elevation_3);
-            height_measurement(i, j) = Twb.translation().z() - 0.5 - elevation;
+              float elevation_1 = elevation_matrix(x_index, y_index);
+              float elevation_2 = elevation_matrix(x_index + 1, y_index);
+              float elevation_3 = elevation_matrix(x_index, y_index + 1);
+              float elevation =
+                  std::min(std::min(elevation_1, elevation_2), elevation_3);
+              height_measurement_(i, j) =
+                  Twb.translation().z() - 0.5 - elevation;
+            }
           }
+          height_measurement_local = height_measurement_;
         }
 
         // Test
@@ -176,7 +189,7 @@ class RobotHhfcGz : public RobotBase<float> {
         pointcloud_msg_.header.frame_id = "world";
         pointcloud_msg_.height = 1;
         pointcloud_msg_.width =
-            height_measurement.cols() * height_measurement.rows();
+            height_measurement_local.cols() * height_measurement_local.rows();
         pointcloud_msg_.is_dense = false;
         pointcloud_msg_.is_bigendian = false;
         sensor_msgs::PointCloud2Modifier modifier(pointcloud_msg_);
@@ -186,11 +199,11 @@ class RobotHhfcGz : public RobotBase<float> {
         sensor_msgs::PointCloud2Iterator<float> iter_y(pointcloud_msg_, "y");
         sensor_msgs::PointCloud2Iterator<float> iter_z(pointcloud_msg_, "z");
 
-        for (size_t i = 0; i < height_measurement.size(); ++i) {
+        for (size_t i = 0; i < height_measurement_local.size(); ++i) {
           float x = scan_x_res_ * (i % scan_x_num_) + scan_x_bias_;
           float y =
               scan_y_res_ * static_cast<int>(i / scan_x_num_) + scan_y_bias_;
-          float elevation = -0.5 - height_measurement.data()[i];
+          float elevation = -0.5 - height_measurement_local.data()[i];
           Eigen::Vector3f point(x, y, elevation);
           point = Twm_ * Tmb_yaw * point;
           // point = Twm_ * point;
@@ -228,6 +241,8 @@ class RobotHhfcGz : public RobotBase<float> {
       std::mutex height_mutex_;
       Eigen::Isometry3f Twm_;
       Eigen::MatrixX<Eigen::Vector3f> height_points_;
+      Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+          height_measurement_;
 
       grid_map::GridMap grid_map_;
     };
@@ -296,6 +311,10 @@ class RobotHhfcGz : public RobotBase<float> {
           Eigen::AngleAxisf(euler_rpy_[0], Eigen::Vector3f::UnitX()));
       proj_gravity_ =
           VectorT(Rwb.transpose() * Eigen::Vector3f{0.0, 0.0, -1.0});
+
+      auto copied_scan = scan_interface_->GetHeightMeasurement();
+      std::copy(copied_scan.data(), copied_scan.data() + scan_size_,
+                scan_.data());
 
       if (log_flag_) {
         WriteLog();

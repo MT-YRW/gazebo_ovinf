@@ -49,6 +49,7 @@ PerceptivePolicy::PerceptivePolicy(const YAML::Node &config)
   input_queue_ = moodycamel::ReaderWriterQueue<VectorT>(obs_buffer_size_ * 2);
   last_action_ = VectorT(12).setZero();
   latest_target_ = VectorT(12).setZero();
+  actor_obs_ = VectorT(single_obs_size_ * obs_buffer_size_ + scan_size_);
 
   // Create logger
   log_flag_ = config["log_data"].as<bool>();
@@ -85,15 +86,14 @@ bool PerceptivePolicy::WarmUp(RobotObservation<float> const &obs_pack) {
       obs_buffer_->AddObservation(old_obs);
     }
     obs_buffer_->AddObservation(prop_obs);
-    auto &history_obs = obs_buffer_->GetObsHistory();
-    VectorT actor_obs(single_obs_size_ * obs_buffer_size_ + scan_size_);
 
-    std::copy(history_obs.begin(), history_obs.end(), actor_obs.data());
-    std::copy(obs_pack.scan.begin(), obs_pack.scan.end(),
-              actor_obs.data() + single_obs_size_ * obs_buffer_size_);
+    actor_obs_.segment(0, single_obs_size_ * obs_buffer_size_) =
+        obs_buffer_->GetObsHistory();
+    actor_obs_.segment(single_obs_size_ * obs_buffer_size_, scan_size_) =
+        obs_pack.scan * obs_scale_scan_;
 
     ov::Tensor input_tensor(input_info_.get_element_type(),
-                            input_info_.get_shape(), actor_obs.data());
+                            input_info_.get_shape(), actor_obs_.data());
     infer_start_time_ = std::chrono::high_resolution_clock::now();
 
     infer_request_.set_input_tensor(input_tensor);
@@ -110,6 +110,10 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
   command_scaled.segment(0, 2) =
       obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
   command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
+
+  command_scaled(1) = 0.0;
+  command_scaled.cwiseMin(0.0);
+
   prop_obs.segment(0, 3) = command_scaled * obs_scale_command_;
   prop_obs.segment(3, 12) =
       (obs_pack.joint_pos - joint_default_position_) * obs_scale_dof_pos_;
@@ -129,14 +133,16 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
     }
     obs_buffer_->AddObservation(prop_obs);
     auto &history_obs = obs_buffer_->GetObsHistory();
-    VectorT actor_obs(single_obs_size_ * obs_buffer_size_ + scan_size_);
 
-    std::copy(history_obs.begin(), history_obs.end(), actor_obs.data());
-    std::copy(obs_pack.scan.begin(), obs_pack.scan.end(),
-              actor_obs.data() + single_obs_size_ * obs_buffer_size_);
+    actor_obs_.segment(0, single_obs_size_ * obs_buffer_size_) =
+        obs_buffer_->GetObsHistory();
+    actor_obs_.segment(single_obs_size_ * obs_buffer_size_, scan_size_) =
+        obs_pack.scan * obs_scale_scan_;
+    // actor_obs_.segment(single_obs_size_ * obs_buffer_size_, scan_size_)
+    //     .setConstant(0.4);
 
     ov::Tensor input_tensor(input_info_.get_element_type(),
-                            input_info_.get_shape(), actor_obs.data());
+                            input_info_.get_shape(), actor_obs_.data());
     infer_start_time_ = std::chrono::high_resolution_clock::now();
 
     infer_request_.set_input_tensor(input_tensor);
