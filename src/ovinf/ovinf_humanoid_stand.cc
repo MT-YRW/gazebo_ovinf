@@ -108,7 +108,10 @@ bool HumanoidStandPolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
     current_gait_time_ = 0.0;
     gait_start_time_ = std::chrono::steady_clock::now();
   } else if (gait_start_ == true &&
-             obs_pack.command.norm() < stand_threshold_) {
+             obs_pack.command.norm() < stand_threshold_ &&
+             std::abs(std::sin(2 * M_PI * current_gait_time_ / cycle_time_)) <
+                 0.02 &&
+             std::cos(2 * M_PI * current_gait_time_ / cycle_time_) > 0.0) {
     gait_start_ = false;
   }
 
