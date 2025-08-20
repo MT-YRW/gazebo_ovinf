@@ -162,9 +162,9 @@ class RobotHhfcGz : public RobotBase<float> {
               Eigen::Vector3f point_b = height_points_(i, j);
               auto point_m = Tmb_yaw * point_b;
               int x_index =
-                  std::floor((-point_m.x() + length_x / 2.0f) / resolution);
+                  std::round((-point_m.x() + length_x / 2.0f) / resolution);
               int y_index =
-                  std::floor((-point_m.y() + length_y / 2.0f) / resolution);
+                  std::round((-point_m.y() + length_y / 2.0f) / resolution);
               x_index = std::max(
                   0, std::min(x_index,
                               static_cast<int>(elevation_matrix.rows()) - 2));
@@ -175,8 +175,10 @@ class RobotHhfcGz : public RobotBase<float> {
               float elevation_1 = elevation_matrix(x_index, y_index);
               float elevation_2 = elevation_matrix(x_index + 1, y_index);
               float elevation_3 = elevation_matrix(x_index, y_index + 1);
-              float elevation =
-                  std::min(std::min(elevation_1, elevation_2), elevation_3);
+              float elevation_4 = elevation_matrix(x_index + 1, y_index + 1);
+              float elevation = std::min(
+                  elevation_4,
+                  std::min(std::min(elevation_1, elevation_2), elevation_3));
               height_measurement_(i, j) =
                   Twb.translation().z() - 0.5 - elevation;
             }
@@ -200,9 +202,9 @@ class RobotHhfcGz : public RobotBase<float> {
         sensor_msgs::PointCloud2Iterator<float> iter_z(pointcloud_msg_, "z");
 
         for (size_t i = 0; i < height_measurement_local.size(); ++i) {
-          float x = scan_x_res_ * (i % scan_x_num_) + scan_x_bias_;
-          float y =
-              scan_y_res_ * static_cast<int>(i / scan_x_num_) + scan_y_bias_;
+          float x =
+              scan_x_res_ * static_cast<int>(i / scan_y_num_) + scan_x_bias_;
+          float y = scan_y_res_ * (i % scan_y_num_) + scan_y_bias_;
           float elevation = -0.5 - height_measurement_local.data()[i];
           Eigen::Vector3f point(x, y, elevation);
           point = Twm_ * Tmb_yaw * point;

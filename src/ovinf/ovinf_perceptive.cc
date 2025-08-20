@@ -112,7 +112,7 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
   command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
 
   command_scaled(1) = 0.0;
-  command_scaled.cwiseMin(0.0);
+  command_scaled(0) = std::max(0.0f, command_scaled(0));
 
   prop_obs.segment(0, 3) = command_scaled * obs_scale_command_;
   prop_obs.segment(3, 12) =
@@ -139,7 +139,7 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
     actor_obs_.segment(single_obs_size_ * obs_buffer_size_, scan_size_) =
         obs_pack.scan * obs_scale_scan_;
     // actor_obs_.segment(single_obs_size_ * obs_buffer_size_, scan_size_)
-    //     .setConstant(0.4);
+    //     .setConstant(0.0);
 
     ov::Tensor input_tensor(input_info_.get_element_type(),
                             input_info_.get_shape(), actor_obs_.data());
