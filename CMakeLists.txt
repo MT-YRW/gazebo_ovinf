@@ -32,6 +32,7 @@ target_include_directories(ovinf PUBLIC
 target_link_libraries(ovinf
   openvino::runtime
   yaml-cpp
+  readerwriterqueue
 )
 
 set(BUILD_TEST OFF CACHE BOOL "Build test executables")
