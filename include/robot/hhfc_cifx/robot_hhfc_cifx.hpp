@@ -112,7 +112,7 @@ class RobotHhfcCifx : public RobotBase<float> {
         robot_cifx->extra_data_->Set<"r_p_tor">(
             robot_cifx->Executor()->JointTargetTorque()[RAnklePitchJoint]);
         robot_cifx->extra_data_->Set<"r_r_tor">(
-            robot_cifx->Executor()->JointTargetTorque()[RAnklePitchJoint]);
+            robot_cifx->Executor()->JointTargetTorque()[RAnkleRollJoint]);
       }
 
       // Anti-parallellogram linkage handle
