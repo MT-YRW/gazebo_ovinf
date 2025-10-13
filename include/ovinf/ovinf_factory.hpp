@@ -5,6 +5,7 @@
 #include "ovinf_epsilon.h"
 #include "ovinf_humanoid.h"
 #include "ovinf_humanoid_stand.h"
+#include "ovinf_locomotion.h"
 #include "ovinf_perceptive.h"
 
 namespace ovinf {
@@ -23,6 +24,8 @@ class PolicyFactory {
       return std::make_shared<EpsilonPolicy>(config);
     } else if (policy_type == "Perceptive") {
       return std::make_shared<PerceptivePolicy>(config);
+    } else if (policy_type == "Locomotion") {
+      return std::make_shared<LocomotionPolicy>(config);
     } else {
       throw std::invalid_argument("Unknown policy type: " + policy_type);
     }
