@@ -371,17 +371,17 @@ void RobotHhfcCifx::GetDevice(const KernelBus& bus) {
   motors_[LAnkleLongMotor] = bus.GetDevice<MotorDevice>(14).value();
   motors_[LAnkleShortMotor] = bus.GetDevice<MotorDevice>(15).value();
 
-  motors_[RHipPitchMotor] = bus.GetDevice<MotorDevice>(4).value();
-  motors_[RHipRollMotor] = bus.GetDevice<MotorDevice>(5).value();
-  motors_[RHipYawMotor] = bus.GetDevice<MotorDevice>(6).value();
-  motors_[RKneeMotor] = bus.GetDevice<MotorDevice>(7).value();
-  motors_[RAnkleLongMotor] = bus.GetDevice<MotorDevice>(8).value();
-  motors_[RAnkleShortMotor] = bus.GetDevice<MotorDevice>(9).value();
+  motors_[RHipPitchMotor] = bus.GetDevice<MotorDevice>(3).value();
+  motors_[RHipRollMotor] = bus.GetDevice<MotorDevice>(4).value();
+  motors_[RHipYawMotor] = bus.GetDevice<MotorDevice>(5).value();
+  motors_[RKneeMotor] = bus.GetDevice<MotorDevice>(6).value();
+  motors_[RAnkleLongMotor] = bus.GetDevice<MotorDevice>(7).value();
+  motors_[RAnkleShortMotor] = bus.GetDevice<MotorDevice>(8).value();
 
   motors_[LShoulderPitchMotor] = bus.GetDevice<MotorDevice>(1).value();
   motors_[RShoulderPitchMotor] = bus.GetDevice<MotorDevice>(0).value();
 
-  imu_ = bus.GetDevice<ImuDevice>(3).value();
+  imu_ = bus.GetDevice<ImuDevice>(16).value();
 }
 
 void RobotHhfcCifx::ObserverHhfcCifx::CreateLog(YAML::Node const& config) {
