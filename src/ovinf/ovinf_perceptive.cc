@@ -110,7 +110,6 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
   command_scaled.segment(0, 2) =
       obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
   command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
-
   command_scaled(1) = 0.0;
   command_scaled(0) = std::max(0.0f, command_scaled(0));
 
@@ -119,8 +118,7 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
       (obs_pack.joint_pos - joint_default_position_) * obs_scale_dof_pos_;
   prop_obs.segment(15, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
   prop_obs.segment(27, 12) = last_action_;
-  prop_obs.segment(39, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
-  prop_obs.segment(42, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
+  prop_obs.segment(39, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(prop_obs);
