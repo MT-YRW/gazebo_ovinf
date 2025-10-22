@@ -1,5 +1,5 @@
-#ifndef OVINF_PERCEPTIVE_H
-#define OVINF_PERCEPTIVE_H
+#ifndef OVINF_PERCEPTIVE2_H
+#define OVINF_PERCEPTIVE2_H
 
 #include <yaml-cpp/yaml.h>
 
