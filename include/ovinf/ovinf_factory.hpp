@@ -26,7 +26,7 @@ class PolicyFactory {
     } else if (policy_type == "Perceptive") {
       return std::make_shared<PerceptivePolicy>(config);
     } else if (policy_type == "Perceptive2") {
-      return std::make_shared<LocomotionPolicy>(config);
+      return std::make_shared<PerceptivePolicy2>(config);
     } else {
       throw std::invalid_argument("Unknown policy type: " + policy_type);
     }
