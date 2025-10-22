@@ -2,14 +2,14 @@
 
 namespace ovinf {
 
-PerceptivePolicy::~PerceptivePolicy() {
+PerceptivePolicy2::~PerceptivePolicy2() {
   exiting_.store(true);
   if (worker_thread_.joinable()) {
     worker_thread_.join();
   }
 }
 
-PerceptivePolicy::PerceptivePolicy(const YAML::Node &config)
+PerceptivePolicy2::PerceptivePolicy2(const YAML::Node &config)
     : BasePolicy(config) {
   // Read config
   size_t joint_counter = 0;
@@ -69,10 +69,10 @@ PerceptivePolicy::PerceptivePolicy(const YAML::Node &config)
 
   inference_done_.store(true);
   exiting_.store(false);
-  worker_thread_ = std::thread(&PerceptivePolicy::WorkerThread, this);
+  worker_thread_ = std::thread(&PerceptivePolicy2::WorkerThread, this);
 }
 
-bool PerceptivePolicy::WarmUp(RobotObservation<float> const &obs_pack) {
+bool PerceptivePolicy2::WarmUp(RobotObservation<float> const &obs_pack) {
   VectorT prop_obs(single_obs_size_);
   prop_obs.setZero();
 
@@ -103,7 +103,7 @@ bool PerceptivePolicy::WarmUp(RobotObservation<float> const &obs_pack) {
   }
 }
 
-bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
+bool PerceptivePolicy2::InferUnsync(RobotObservation<float> const &obs_pack) {
   VectorT prop_obs(single_obs_size_);
   prop_obs.setZero();
   VectorT command_scaled(3);
@@ -155,7 +155,7 @@ bool PerceptivePolicy::InferUnsync(RobotObservation<float> const &obs_pack) {
   }
 }
 
-std::optional<PerceptivePolicy::VectorT> PerceptivePolicy::GetResult(
+std::optional<PerceptivePolicy2::VectorT> PerceptivePolicy2::GetResult(
     const size_t timeout) {
   if (inference_done_.load()) {
     return latest_target_;
@@ -168,7 +168,7 @@ std::optional<PerceptivePolicy::VectorT> PerceptivePolicy::GetResult(
   }
 }
 
-void PerceptivePolicy::PrintInfo() {
+void PerceptivePolicy2::PrintInfo() {
   std::cout << "Load model: " << this->model_path_ << std::endl;
   std::cout << "Device: " << device_ << std::endl;
   std::cout << "Single obs size: " << single_obs_size_ << std::endl;
@@ -191,7 +191,7 @@ void PerceptivePolicy::PrintInfo() {
   }
 }
 
-void PerceptivePolicy::WorkerThread() {
+void PerceptivePolicy2::WorkerThread() {
   if (realtime_) {
     if (!setProcessHighPriority(99)) {
       std::cerr << "Failed to set process high priority." << std::endl;
@@ -225,7 +225,7 @@ void PerceptivePolicy::WorkerThread() {
   }
 }
 
-void PerceptivePolicy::CreateLog(YAML::Node const &config) {
+void PerceptivePolicy2::CreateLog(YAML::Node const &config) {
   auto now = std::chrono::system_clock::now();
   std::time_t now_time = std::chrono::system_clock::to_time_t(now);
   std::tm *now_tm = std::localtime(&now_time);
@@ -274,7 +274,7 @@ void PerceptivePolicy::CreateLog(YAML::Node const &config) {
   csv_logger_ = std::make_shared<CsvLogger>(logger_file, headers);
 }
 
-void PerceptivePolicy::WriteLog(RobotObservation<float> const &obs_pack) {
+void PerceptivePolicy2::WriteLog(RobotObservation<float> const &obs_pack) {
   std::vector<CsvLogger::Number> datas;
 
   for (size_t i = 0; i < 3; ++i) {
