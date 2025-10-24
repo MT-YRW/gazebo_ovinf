@@ -8,6 +8,7 @@
 #include "ovinf_locomotion.h"
 #include "ovinf_perceptive.h"
 #include "ovinf_perceptive_2.h"
+#include "ovinf_perceptive_3.h"
 
 namespace ovinf {
 
@@ -27,7 +28,9 @@ class PolicyFactory {
       return std::make_shared<PerceptivePolicy>(config);
     } else if (policy_type == "Perceptive2") {
       return std::make_shared<PerceptivePolicy2>(config);
-    } else {
+    } else if (policy_type == "Perceptive3") {
+      return std::make_shared<PerceptivePolicy3>(config);
+    }else {
       throw std::invalid_argument("Unknown policy type: " + policy_type);
     }
   }
