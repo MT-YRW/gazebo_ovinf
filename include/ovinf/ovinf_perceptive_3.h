@@ -62,6 +62,7 @@ class PerceptivePolicy3 : public BasePolicy<float> {
   // Infer data
   std::map<std::string, size_t> joint_names_;
   float cycle_time_;
+  float stand_threshold_;
   VectorT joint_default_position_;
 
   size_t single_obs_size_;

@@ -17,6 +17,8 @@ PerceptivePolicy3::PerceptivePolicy3(const YAML::Node &config)
     joint_names_[name.as<std::string>()] = joint_counter++;
   }
 
+  stand_threshold_ = config["stand_threshold"].as<float>();
+  use_absolute_clock_ = config["use_absolute_clock"].as<bool>();
   cycle_time_ = config["cycle_time"].as<float>();
   single_obs_size_ = config["single_obs_size"].as<size_t>();
   scan_size_ = config["scan_size"].as<size_t>();
@@ -105,20 +107,32 @@ bool PerceptivePolicy3::WarmUp(RobotObservation<float> const &obs_pack) {
 }
 
 bool PerceptivePolicy3::InferUnsync(RobotObservation<float> const &obs_pack) {
-  if (gait_start_ == false) {
+  if (gait_start_ == false && obs_pack.command.norm() > stand_threshold_) {
     gait_start_ = true;
-    gait_start_time_ = std::chrono::steady_clock::now();
     current_gait_time_ = 0.0;
+    gait_start_time_ = std::chrono::steady_clock::now();
+  } else if (gait_start_ == true &&
+             obs_pack.command.norm() < stand_threshold_ &&
+             std::abs(std::sin(2 * M_PI * current_gait_time_ / cycle_time_)) <
+                 0.05 &&
+             std::cos(2 * M_PI * current_gait_time_ / cycle_time_) > 0.0) {
+    gait_start_ = false;
   }
-  if (use_absolute_clock_) {
-    current_gait_time_ =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() -
-                                      gait_start_time_)
-            .count();
-  } else {
-    current_gait_time_ += control_period_;
+
+  double gait_time_value = 0.0;
+  if (gait_start_) {
+    if (use_absolute_clock_) {
+      current_gait_time_ =
+          std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                        gait_start_time_)
+              .count();
+    } else {
+      current_gait_time_ += control_period_;
+    }
+
+    gait_time_value = 2 * M_PI * current_gait_time_ / cycle_time_;
   }
-  double gait_time_value = 2 * M_PI * current_gait_time_ / cycle_time_;
+  
   VectorT prop_obs(single_obs_size_);
   prop_obs.setZero();
   prop_obs.segment(0, 2) =

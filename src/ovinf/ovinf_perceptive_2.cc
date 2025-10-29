@@ -75,6 +75,7 @@ PerceptivePolicy2::PerceptivePolicy2(const YAML::Node &config)
 bool PerceptivePolicy2::WarmUp(RobotObservation<float> const &obs_pack) {
   VectorT prop_obs(single_obs_size_);
   prop_obs.setZero();
+  gait_start_ = false;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(prop_obs);
@@ -104,22 +105,37 @@ bool PerceptivePolicy2::WarmUp(RobotObservation<float> const &obs_pack) {
 }
 
 bool PerceptivePolicy2::InferUnsync(RobotObservation<float> const &obs_pack) {
+  if (gait_start_ == false) {
+    gait_start_ = true;
+    gait_start_time_ = std::chrono::steady_clock::now();
+    current_gait_time_ = 0.0;
+  }
+  if (use_absolute_clock_) {
+    current_gait_time_ =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() -
+                                      gait_start_time_)
+            .count();
+  } else {
+    current_gait_time_ += control_period_;
+  }
+  double gait_time_value = 2 * M_PI * current_gait_time_ / cycle_time_;
   VectorT prop_obs(single_obs_size_);
   prop_obs.setZero();
+  prop_obs.segment(0, 2) =
+      Eigen::Vector2f{std::sin(gait_time_value), std::cos(gait_time_value)};
   VectorT command_scaled(3);
   command_scaled.segment(0, 2) =
       obs_pack.command.segment(0, 2) * obs_scale_lin_vel_;
   command_scaled(2) = obs_pack.command(2) * obs_scale_ang_vel_;
   command_scaled(1) = 0.0;
   command_scaled(0) = std::max(0.0f, command_scaled(0));
-
-  prop_obs.segment(0, 3) = command_scaled * obs_scale_command_;
-  prop_obs.segment(3, 12) =
+  prop_obs.segment(2, 3) = command_scaled * obs_scale_command_;
+  prop_obs.segment(5, 12) =
       (obs_pack.joint_pos - joint_default_position_) * obs_scale_dof_pos_;
-  prop_obs.segment(15, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
-  prop_obs.segment(27, 12) = last_action_;
-  prop_obs.segment(39, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
-  prop_obs.segment(42, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
+  prop_obs.segment(17, 12) = obs_pack.joint_vel * obs_scale_dof_vel_;
+  prop_obs.segment(29, 12) = last_action_;
+  prop_obs.segment(41, 3) = obs_pack.ang_vel * obs_scale_ang_vel_;
+  prop_obs.segment(44, 3) = obs_pack.proj_gravity * obs_scale_proj_gravity_;
 
   if (!inference_done_.load()) {
     input_queue_.enqueue(prop_obs);
